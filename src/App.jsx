@@ -1,8 +1,11 @@
 import { useState, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Registrierung from './Registrierung'
 import Login from './Login'
 import Dashboard from './Dashboard'
+import Mannschaften from './Mannschaften'
+import Spiele from './Spiele'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -30,7 +33,17 @@ function App() {
   if (!session) {
     return <Login />
   }
-  return <Dashboard session={session} />
+
+  return (
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard session={session} />} />
+        <Route path="/mannschaften" element={<Mannschaften session={session} />} />
+        <Route path="/spiele" element={<Spiele session={session} />} />
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </BrowserRouter>
+  )
 }
 
 export default App
