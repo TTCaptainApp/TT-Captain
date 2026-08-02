@@ -1,0 +1,9 @@
+{
+  "name": "TT Captain",
+  "short_name": "TT Captain",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1C8A4E",
+  "theme_color": "#1C8A4E",
+  "icons": []
+} 
