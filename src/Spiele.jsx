@@ -15,7 +15,10 @@ const statusFarbe = {
 }
 
 function Spiele({ session }) {
+  const [istAdmin, setIstAdmin] = useState(false)
+  const [vereinId, setVereinId] = useState(null)
   const [meineMannschaften, setMeineMannschaften] = useState([]) // {mannschaft_id, name, rolle}
+  const [alleMannschaften, setAlleMannschaften] = useState([]) // {id, name} - nur für Admins
   const [spiele, setSpiele] = useState([])
   const [formOffen, setFormOffen] = useState(false)
   const [mannschaftId, setMannschaftId] = useState('')
@@ -35,6 +38,18 @@ function Spiele({ session }) {
   }
 
   useEffect(() => {
+    supabase.from('benutzer').select('verein_id, ist_administrator').eq('id', session.user.id).single()
+      .then(({ data }) => {
+        if (data) {
+          setVereinId(data.verein_id)
+          setIstAdmin(data.ist_administrator)
+          if (data.ist_administrator) {
+            supabase.from('mannschaften').select('id, name').eq('verein_id', data.verein_id).order('name')
+              .then(({ data: teams }) => setAlleMannschaften(teams || []))
+          }
+        }
+      })
+
     supabase
       .from('mannschaftszuordnungen')
       .select('mannschaft_id, rolle, mannschaften(name)')
@@ -46,10 +61,16 @@ function Spiele({ session }) {
           name: z.mannschaften?.name
         })))
       })
+
     ladeSpiele()
   }, [session])
 
-  const kannSpielAnlegen = meineMannschaften.some(m => m.rolle === 'spielfuehrer' || m.rolle === 'stellvertreter')
+  const kannSpielAnlegen = istAdmin || meineMannschaften.some(m => m.rolle === 'spielfuehrer' || m.rolle === 'stellvertreter')
+
+  // Für die Auswahlliste: Admins sehen alle Vereinsmannschaften, andere nur die, wo sie Spielführer/Stellvertreter sind
+  const auswahlMannschaften = istAdmin
+    ? alleMannschaften.map(m => ({ mannschaft_id: m.id, name: m.name }))
+    : meineMannschaften.filter(m => m.rolle === 'spielfuehrer' || m.rolle === 'stellvertreter')
 
   const spielAnlegen = async (e) => {
     e.preventDefault()
@@ -96,9 +117,9 @@ function Spiele({ session }) {
           <form onSubmit={spielAnlegen} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 8 }}>
             <select style={inputStyle} value={mannschaftId} onChange={e => setMannschaftId(e.target.value)}>
               <option value="">Mannschaft wählen...</option>
-              {meineMannschaften
-                .filter(m => m.rolle === 'spielfuehrer' || m.rolle === 'stellvertreter')
-                .map(m => <option key={m.mannschaft_id} value={m.mannschaft_id}>{m.name}</option>)}
+              {auswahlMannschaften.map(m => (
+                <option key={m.mannschaft_id} value={m.mannschaft_id}>{m.name}</option>
+              ))}
             </select>
             <input style={inputStyle} placeholder="Gegner" value={gegner} onChange={e => setGegner(e.target.value)} />
             <select style={inputStyle} value={heimAuswaerts} onChange={e => setHeimAuswaerts(e.target.value)}>
@@ -135,4 +156,4 @@ function Spiele({ session }) {
   )
 }
 
-export default Spiele
+export default Spiele 
