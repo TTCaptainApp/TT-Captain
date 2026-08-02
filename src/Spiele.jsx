@@ -256,7 +256,9 @@ function Spiele({ session }) {
           <div key={s.id} style={cardStyle}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>
-                {s.mannschaften?.name} vs. {s.gegner}
+                {s.heim_oder_auswaerts === 'heim'
+                  ? `${s.mannschaften?.name} vs. ${s.gegner}`
+                  : `${s.gegner} vs. ${s.mannschaften?.name}`}
               </span>
               <span style={{ fontSize: 11, fontWeight: 700, color: statusFarbe[s.status] || '#5B6D66', textTransform: 'uppercase' }}>
                 {s.status}
@@ -274,4 +276,4 @@ function Spiele({ session }) {
   )
 }
 
-export default Spiele 
+export default Spiele
