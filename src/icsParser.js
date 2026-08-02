@@ -1,14 +1,17 @@
-// Sehr einfacher ICS-Parser: liest VEVENT-Blöcke und extrahiert
-// SUMMARY, DTSTART und LOCATION. Deckt die gängigen Exportformate
-// von myTischtennis/click-TT ab.
-
 function entfalten(text) {
-  // RFC5545: Fortsetzungszeilen beginnen mit einem Leerzeichen oder Tab
   return text.replace(/\r\n/g, '\n').replace(/\n[ \t]/g, '')
 }
 
+function entmaskieren(wert) {
+  // ICS maskiert Kommas, Semikolons, Backslashes und Zeilenumbrüche
+  return wert
+    .replace(/\\n/gi, ', ')
+    .replace(/\\,/g, ',')
+    .replace(/\\;/g, ';')
+    .replace(/\\\\/g, '\\')
+}
+
 function parseDatumZeit(wert) {
-  // wert z.B. "20260913T190000" oder "20260913"
   const match = wert.match(/(\d{4})(\d{2})(\d{2})(T(\d{2})(\d{2}))?/)
   if (!match) return { datum: null, uhrzeit: null }
   const [, jahr, monat, tag, , stunde, minute] = match
@@ -31,9 +34,9 @@ export function parseICS(text) {
 
     for (const zeile of zeilen) {
       if (zeile.startsWith('SUMMARY')) {
-        summary = zeile.split(':').slice(1).join(':').trim()
+        summary = entmaskieren(zeile.split(':').slice(1).join(':').trim())
       } else if (zeile.startsWith('LOCATION')) {
-        location = zeile.split(':').slice(1).join(':').trim()
+        location = entmaskieren(zeile.split(':').slice(1).join(':').trim())
       } else if (zeile.startsWith('DTSTART')) {
         dtstartWert = zeile.split(':').slice(1).join(':').trim()
       }
@@ -41,5 +44,25 @@ export function parseICS(text) {
 
     const { datum, uhrzeit } = parseDatumZeit(dtstartWert)
     return { summary, location, datum, uhrzeit }
-  }).filter(e => e.datum) // Einträge ohne erkennbares Datum überspringen
+  }).filter(e => e.datum)
+}
+
+// Zerlegt eine Paarung wie "Team A vs Team B" in Heim-/Auswärts-Team und
+// gibt den Gegner + Heim/Auswärts zurück, sofern der eigene Teamname erkannt wird.
+export function gegnerErmitteln(summary, eigenerName) {
+  const teile = summary.split(/\s+vs\.?\s+/i)
+
+  if (teile.length === 2 && eigenerName && eigenerName.trim()) {
+    const eigen = eigenerName.trim().toLowerCase()
+    const [erste, zweite] = teile
+    if (erste.toLowerCase().includes(eigen)) {
+      return { gegner: zweite.trim(), heimAuswaerts: 'heim' }
+    }
+    if (zweite.toLowerCase().includes(eigen)) {
+      return { gegner: erste.trim(), heimAuswaerts: 'auswaerts' }
+    }
+  }
+
+  // Fallback: konnte nicht zugeordnet werden, komplette Paarung als Gegner anzeigen
+  return { gegner: summary, heimAuswaerts: 'heim' }
 }
