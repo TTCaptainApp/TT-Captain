@@ -1,22 +1,25 @@
 import { useState } from 'react'
 import { supabase } from './supabaseClient'
+import Brand from './Brand'
 
 const pageStyle = {
-  minHeight: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center',
-  justifyContent: 'center', fontFamily: 'sans-serif', background: '#F6FAF8',
-  color: '#16261F', padding: '20px', textAlign: 'center'
+  minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F', padding: 20
 }
-const buttonStyle = {
-  background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8,
-  padding: '10px 0', fontSize: 15, cursor: 'pointer'
+const cardStyle = {
+  background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 16,
+  padding: '28px 24px', width: '100%', maxWidth: 360,
+  display: 'flex', flexDirection: 'column', gap: 10
 }
-const inputStyle = { padding: '9px 10px', fontSize: 15, borderRadius: 6, border: '1px solid #DCE7E2' }
+const inputStyle = { padding: '10px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #DCE7E2', fontFamily: 'inherit', width: '100%' }
 const wrapStyle = { position: 'relative', display: 'flex', flexDirection: 'column' }
 const hintStyle = { fontSize: 12, textAlign: 'left', marginTop: 2 }
-const eyeButtonStyle = {
-  position: 'absolute', right: 8, top: 8, background: 'none', border: 'none',
-  cursor: 'pointer', fontSize: 16, padding: 2
+const eyeButtonStyle = { position: 'absolute', right: 8, top: 8, background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 2 }
+const buttonStyle = {
+  background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8,
+  padding: '11px 0', fontSize: 15, fontWeight: 600, cursor: 'pointer', marginTop: 4
 }
+const subTextStyle = { fontFamily: 'Inter, sans-serif', fontSize: 13, color: '#5B6D66', textAlign: 'center', margin: '2px 0 6px' }
 
 function MatchHint({ value, compareValue, label }) {
   if (!value || !compareValue) return null
@@ -46,7 +49,6 @@ function Registrierung({ inviteCode }) {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setFehler(null)
-
     if (!datenschutz || !nutzungsbedingungen) {
       setFehler('Bitte Datenschutz und Nutzungsbedingungen akzeptieren.')
       return
@@ -59,7 +61,6 @@ function Registrierung({ inviteCode }) {
       setFehler('Die beiden Passwörter stimmen nicht überein.')
       return
     }
-
     setLadend(true)
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
@@ -67,24 +68,19 @@ function Registrierung({ inviteCode }) {
       options: { data: { vorname, nachname, telefonnummer, invite_code: inviteCode } }
     })
     setLadend(false)
-
-    if (error) {
-      setFehler(error.message)
-      return
-    }
-    // Keine Bestätigung nötig - App.jsx übernimmt die neue Sitzung automatisch.
+    if (error) setFehler(error.message)
   }
 
   return (
     <div style={pageStyle}>
-      <h1>Willkommen bei TT Captain</h1>
-      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 10, width: '100%', maxWidth: 340 }}>
+      <form onSubmit={handleSubmit} style={cardStyle}>
+        <Brand />
+        <p style={subTextStyle}>Willkommen! Leg dir kurz einen Zugang an.</p>
+
         <input style={inputStyle} placeholder="Vorname" value={vorname} onChange={e => setVorname(e.target.value)} required />
         <input style={inputStyle} placeholder="Nachname" value={nachname} onChange={e => setNachname(e.target.value)} required />
 
-        <div style={wrapStyle}>
-          <input style={inputStyle} type="email" placeholder="E-Mail" value={email} onChange={e => setEmail(e.target.value)} required />
-        </div>
+        <input style={inputStyle} type="email" placeholder="E-Mail" value={email} onChange={e => setEmail(e.target.value)} required />
         <div style={wrapStyle}>
           <input style={inputStyle} type="email" placeholder="E-Mail wiederholen" value={emailWiederholung} onChange={e => setEmailWiederholung(e.target.value)} required />
           <MatchHint value={email} compareValue={emailWiederholung} label="E-Mails" />
@@ -106,16 +102,16 @@ function Registrierung({ inviteCode }) {
           <MatchHint value={passwort} compareValue={passwortWiederholung} label="Passwörter" />
         </div>
 
-        <label style={{ fontSize: 13, textAlign: 'left' }}>
+        <label style={{ fontSize: 12.5, textAlign: 'left', color: '#5B6D66' }}>
           <input type="checkbox" checked={datenschutz} onChange={e => setDatenschutz(e.target.checked)} />{' '}
-          Ich akzeptiere die <a href="/datenschutz.html" target="_blank" rel="noreferrer">Datenschutzerklärung</a>
+          Ich akzeptiere die <a href="/datenschutz.html" target="_blank" rel="noreferrer" style={{ color: '#1C8A4E' }}>Datenschutzerklärung</a>
         </label>
-        <label style={{ fontSize: 13, textAlign: 'left' }}>
+        <label style={{ fontSize: 12.5, textAlign: 'left', color: '#5B6D66' }}>
           <input type="checkbox" checked={nutzungsbedingungen} onChange={e => setNutzungsbedingungen(e.target.checked)} />{' '}
-          Ich akzeptiere die <a href="/nutzungsbedingungen.html" target="_blank" rel="noreferrer">Nutzungsbedingungen</a>
+          Ich akzeptiere die <a href="/nutzungsbedingungen.html" target="_blank" rel="noreferrer" style={{ color: '#1C8A4E' }}>Nutzungsbedingungen</a>
         </label>
 
-        {fehler && <p style={{ color: '#c0392b' }}>{fehler}</p>}
+        {fehler && <p style={{ color: '#c0392b', fontSize: 13, margin: 0 }}>{fehler}</p>}
         <button type="submit" style={buttonStyle} disabled={ladend}>
           {ladend ? 'Einen Moment...' : 'Registrieren'}
         </button>
