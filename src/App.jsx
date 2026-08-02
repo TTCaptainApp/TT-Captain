@@ -1,33 +1,36 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
+import Registrierung from './Registrierung'
+import Login from './Login'
+import Dashboard from './Dashboard'
 
 function App() {
-  const [status, setStatus] = useState('Verbinde mit Supabase...')
+  const [session, setSession] = useState(null)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(() => {
-      setStatus('Verbindung zu Supabase steht ✅')
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setLoading(false)
     })
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession)
+    })
+    return () => listener.subscription.unsubscribe()
   }, [])
 
-  return (
-    <div style={{
-      minHeight: '100vh',
-      display: 'flex',
-      flexDirection: 'column',
-      alignItems: 'center',
-      justifyContent: 'center',
-      fontFamily: 'sans-serif',
-      background: '#F6FAF8',
-      color: '#16261F',
-      textAlign: 'center',
-      padding: '20px'
-    }}>
-      <h1>🏓 TT Captain</h1>
-      <p>{status}</p>
-      <p style={{ fontSize: '13px', color: '#5B6D66' }}>Sprint 1 – Grundgerüst</p>
-    </div>
-  )
+  if (loading) return null
+
+  const params = new URLSearchParams(window.location.search)
+  const inviteCode = params.get('invite')
+
+  if (!session && inviteCode) {
+    return <Registrierung inviteCode={inviteCode} />
+  }
+  if (!session) {
+    return <Login />
+  }
+  return <Dashboard session={session} />
 }
 
-export default App 
+export default App
