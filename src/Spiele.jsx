@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
-import { parseICS } from './icsParser'
+import { parseICS, gegnerErmitteln } from './icsParser'
 
 const cardStyle = { background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 14, marginBottom: 10 }
 const inputStyle = { padding: '9px 10px', fontSize: 14, borderRadius: 8, border: '1px solid #DCE7E2', fontFamily: 'inherit', width: '100%' }
@@ -24,7 +24,6 @@ function Spiele({ session }) {
   const [formOffen, setFormOffen] = useState(false)
   const [importOffen, setImportOffen] = useState(false)
 
-  // Manuelles Formular
   const [mannschaftId, setMannschaftId] = useState('')
   const [gegner, setGegner] = useState('')
   const [heimAuswaerts, setHeimAuswaerts] = useState('heim')
@@ -33,8 +32,8 @@ function Spiele({ session }) {
   const [halle, setHalle] = useState('')
   const [fehler, setFehler] = useState(null)
 
-  // ICS-Import
   const [importMannschaftId, setImportMannschaftId] = useState('')
+  const [eigenerName, setEigenerName] = useState('')
   const [importEvents, setImportEvents] = useState([])
   const [importFehler, setImportFehler] = useState(null)
   const [importLaeuft, setImportLaeuft] = useState(false)
@@ -97,6 +96,13 @@ function Spiele({ session }) {
     ladeSpiele()
   }
 
+  const neuParsen = (rohEvents) => {
+    setImportEvents(rohEvents.map(ev => {
+      const { gegner, heimAuswaerts } = gegnerErmitteln(ev.summary, eigenerName)
+      return { ...ev, gegner, heimAuswaerts, uebernehmen: true }
+    }))
+  }
+
   const dateiAusgewaehlt = (e) => {
     const datei = e.target.files[0]
     if (!datei) return
@@ -109,7 +115,7 @@ function Spiele({ session }) {
           setImportFehler('Keine Termine in der Datei gefunden.')
           return
         }
-        setImportEvents(events.map(ev => ({ ...ev, gegner: ev.summary, heimAuswaerts: 'heim', uebernehmen: true })))
+        neuParsen(events)
       } catch {
         setImportFehler('Die Datei konnte nicht gelesen werden. Ist es eine gültige .ics-Datei?')
       }
@@ -180,10 +186,22 @@ function Spiele({ session }) {
               ))}
             </select>
 
-            <input type="file" accept=".ics" onChange={dateiAusgewaehlt} style={{ fontSize: 13 }} />
-            <p style={{ fontSize: 12, color: '#5B6D66', margin: 0 }}>
-              ICS-Datei von myTischtennis/click-TT exportieren und hier auswählen.
+            <input
+              style={inputStyle}
+              placeholder="Euer Teamname wie in der ICS-Datei (z.B. Wedeler TSV IV)"
+              value={eigenerName}
+              onChange={e => {
+                setEigenerName(e.target.value)
+                if (importEvents.length > 0) {
+                  neuParsen(importEvents.map(ev => ({ summary: ev.summary, location: ev.location, datum: ev.datum, uhrzeit: ev.uhrzeit })))
+                }
+              }}
+            />
+            <p style={{ fontSize: 11.5, color: '#5B6D66', margin: 0 }}>
+              Damit erkennen wir automatisch, wer der Gegner ist und ob Heim- oder Auswärtsspiel.
             </p>
+
+            <input type="file" accept=".ics" onChange={dateiAusgewaehlt} style={{ fontSize: 13 }} />
 
             {importFehler && <p style={{ color: '#c0392b', fontSize: 13, margin: 0 }}>{importFehler}</p>}
 
@@ -256,4 +274,4 @@ function Spiele({ session }) {
   )
 }
 
-export default Spiele
+export default Spiele 
