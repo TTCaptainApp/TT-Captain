@@ -2,10 +2,12 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
+import { parseICS } from './icsParser'
 
 const cardStyle = { background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 14, marginBottom: 10 }
 const inputStyle = { padding: '9px 10px', fontSize: 14, borderRadius: 8, border: '1px solid #DCE7E2', fontFamily: 'inherit', width: '100%' }
 const buttonStyle = { background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }
+const secondaryButtonStyle = { ...buttonStyle, background: 'transparent', color: '#1C8A4E', border: '1px solid #1C8A4E' }
 
 const statusFarbe = {
   geplant: '#1C8A4E',
@@ -16,11 +18,13 @@ const statusFarbe = {
 
 function Spiele({ session }) {
   const [istAdmin, setIstAdmin] = useState(false)
-  const [vereinId, setVereinId] = useState(null)
-  const [meineMannschaften, setMeineMannschaften] = useState([]) // {mannschaft_id, name, rolle}
-  const [alleMannschaften, setAlleMannschaften] = useState([]) // {id, name} - nur für Admins
+  const [meineMannschaften, setMeineMannschaften] = useState([])
+  const [alleMannschaften, setAlleMannschaften] = useState([])
   const [spiele, setSpiele] = useState([])
   const [formOffen, setFormOffen] = useState(false)
+  const [importOffen, setImportOffen] = useState(false)
+
+  // Manuelles Formular
   const [mannschaftId, setMannschaftId] = useState('')
   const [gegner, setGegner] = useState('')
   const [heimAuswaerts, setHeimAuswaerts] = useState('heim')
@@ -28,6 +32,12 @@ function Spiele({ session }) {
   const [uhrzeit, setUhrzeit] = useState('')
   const [halle, setHalle] = useState('')
   const [fehler, setFehler] = useState(null)
+
+  // ICS-Import
+  const [importMannschaftId, setImportMannschaftId] = useState('')
+  const [importEvents, setImportEvents] = useState([])
+  const [importFehler, setImportFehler] = useState(null)
+  const [importLaeuft, setImportLaeuft] = useState(false)
 
   const ladeSpiele = async () => {
     const { data } = await supabase
@@ -41,7 +51,6 @@ function Spiele({ session }) {
     supabase.from('benutzer').select('verein_id, ist_administrator').eq('id', session.user.id).single()
       .then(({ data }) => {
         if (data) {
-          setVereinId(data.verein_id)
           setIstAdmin(data.ist_administrator)
           if (data.ist_administrator) {
             supabase.from('mannschaften').select('id, name').eq('verein_id', data.verein_id).order('name')
@@ -67,7 +76,6 @@ function Spiele({ session }) {
 
   const kannSpielAnlegen = istAdmin || meineMannschaften.some(m => m.rolle === 'spielfuehrer' || m.rolle === 'stellvertreter')
 
-  // Für die Auswahlliste: Admins sehen alle Vereinsmannschaften, andere nur die, wo sie Spielführer/Stellvertreter sind
   const auswahlMannschaften = istAdmin
     ? alleMannschaften.map(m => ({ mannschaft_id: m.id, name: m.name }))
     : meineMannschaften.filter(m => m.rolle === 'spielfuehrer' || m.rolle === 'stellvertreter')
@@ -80,19 +88,64 @@ function Spiele({ session }) {
       return
     }
     const { error } = await supabase.from('spiele').insert({
-      mannschaft_id: mannschaftId,
-      gegner,
-      heim_oder_auswaerts: heimAuswaerts,
-      datum,
-      uhrzeit: uhrzeit || null,
-      halle: halle || null
+      mannschaft_id: mannschaftId, gegner, heim_oder_auswaerts: heimAuswaerts,
+      datum, uhrzeit: uhrzeit || null, halle: halle || null
     })
-    if (error) {
-      setFehler(error.message)
-      return
-    }
+    if (error) { setFehler(error.message); return }
     setGegner(''); setDatum(''); setUhrzeit(''); setHalle('')
     setFormOffen(false)
+    ladeSpiele()
+  }
+
+  const dateiAusgewaehlt = (e) => {
+    const datei = e.target.files[0]
+    if (!datei) return
+    setImportFehler(null)
+    const reader = new FileReader()
+    reader.onload = () => {
+      try {
+        const events = parseICS(reader.result)
+        if (events.length === 0) {
+          setImportFehler('Keine Termine in der Datei gefunden.')
+          return
+        }
+        setImportEvents(events.map(ev => ({ ...ev, gegner: ev.summary, heimAuswaerts: 'heim', uebernehmen: true })))
+      } catch {
+        setImportFehler('Die Datei konnte nicht gelesen werden. Ist es eine gültige .ics-Datei?')
+      }
+    }
+    reader.readAsText(datei)
+  }
+
+  const importZeileAendern = (index, feld, wert) => {
+    setImportEvents(prev => prev.map((ev, i) => i === index ? { ...ev, [feld]: wert } : ev))
+  }
+
+  const importDurchfuehren = async () => {
+    setImportFehler(null)
+    if (!importMannschaftId) {
+      setImportFehler('Bitte zuerst eine Mannschaft auswählen.')
+      return
+    }
+    const zeilenZumImport = importEvents.filter(ev => ev.uebernehmen)
+    if (zeilenZumImport.length === 0) {
+      setImportFehler('Keine Termine ausgewählt.')
+      return
+    }
+    setImportLaeuft(true)
+    const rows = zeilenZumImport.map(ev => ({
+      mannschaft_id: importMannschaftId,
+      gegner: ev.gegner,
+      heim_oder_auswaerts: ev.heimAuswaerts,
+      datum: ev.datum,
+      uhrzeit: ev.uhrzeit,
+      halle: ev.location || null
+    }))
+    const { error } = await supabase.from('spiele').insert(rows)
+    setImportLaeuft(false)
+    if (error) { setImportFehler(error.message); return }
+    setImportEvents([])
+    setImportOffen(false)
     ladeSpiele()
   }
 
@@ -104,14 +157,61 @@ function Spiele({ session }) {
       </div>
 
       <div style={{ padding: 20, maxWidth: 480, margin: '0 auto' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 16px' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 16px', flexWrap: 'wrap', gap: 8 }}>
           <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 20, margin: 0 }}>Spiele</h1>
           {kannSpielAnlegen && (
-            <button style={buttonStyle} onClick={() => setFormOffen(f => !f)}>
-              {formOffen ? 'Abbrechen' : '+ Spiel'}
-            </button>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button style={secondaryButtonStyle} onClick={() => setImportOffen(o => !o)}>
+                {importOffen ? 'Abbrechen' : '📅 ICS importieren'}
+              </button>
+              <button style={buttonStyle} onClick={() => setFormOffen(f => !f)}>
+                {formOffen ? 'Abbrechen' : '+ Spiel'}
+              </button>
+            </div>
           )}
         </div>
+
+        {importOffen && (
+          <div style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <select style={inputStyle} value={importMannschaftId} onChange={e => setImportMannschaftId(e.target.value)}>
+              <option value="">Mannschaft wählen...</option>
+              {auswahlMannschaften.map(m => (
+                <option key={m.mannschaft_id} value={m.mannschaft_id}>{m.name}</option>
+              ))}
+            </select>
+
+            <input type="file" accept=".ics" onChange={dateiAusgewaehlt} style={{ fontSize: 13 }} />
+            <p style={{ fontSize: 12, color: '#5B6D66', margin: 0 }}>
+              ICS-Datei von myTischtennis/click-TT exportieren und hier auswählen.
+            </p>
+
+            {importFehler && <p style={{ color: '#c0392b', fontSize: 13, margin: 0 }}>{importFehler}</p>}
+
+            {importEvents.length > 0 && (
+              <>
+                <div style={{ fontSize: 13, fontWeight: 600, marginTop: 6 }}>
+                  {importEvents.length} Termine gefunden – prüfen und anpassen:
+                </div>
+                {importEvents.map((ev, i) => (
+                  <div key={i} style={{ border: '1px solid #DCE7E2', borderRadius: 10, padding: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <label style={{ fontSize: 12.5, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <input type="checkbox" checked={ev.uebernehmen} onChange={e => importZeileAendern(i, 'uebernehmen', e.target.checked)} />
+                      {ev.datum} {ev.uhrzeit ? `· ${ev.uhrzeit} Uhr` : ''}
+                    </label>
+                    <input style={inputStyle} value={ev.gegner} onChange={e => importZeileAendern(i, 'gegner', e.target.value)} placeholder="Gegner" />
+                    <select style={inputStyle} value={ev.heimAuswaerts} onChange={e => importZeileAendern(i, 'heimAuswaerts', e.target.value)}>
+                      <option value="heim">Heim</option>
+                      <option value="auswaerts">Auswärts</option>
+                    </select>
+                  </div>
+                ))}
+                <button style={buttonStyle} onClick={importDurchfuehren} disabled={importLaeuft}>
+                  {importLaeuft ? 'Importiere...' : `${importEvents.filter(e => e.uebernehmen).length} Termine importieren`}
+                </button>
+              </>
+            )}
+          </div>
+        )}
 
         {formOffen && (
           <form onSubmit={spielAnlegen} style={{ ...cardStyle, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -156,4 +256,4 @@ function Spiele({ session }) {
   )
 }
 
-export default Spiele 
+export default Spiele
