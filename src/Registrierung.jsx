@@ -15,12 +15,14 @@ function Registrierung({ inviteCode }) {
   const [vorname, setVorname] = useState('')
   const [nachname, setNachname] = useState('')
   const [email, setEmail] = useState('')
+  const [emailWiederholung, setEmailWiederholung] = useState('')
   const [telefonnummer, setTelefonnummer] = useState('')
   const [passwort, setPasswort] = useState('')
+  const [passwortWiederholung, setPasswortWiederholung] = useState('')
   const [datenschutz, setDatenschutz] = useState(false)
   const [nutzungsbedingungen, setNutzungsbedingungen] = useState(false)
-  const [status, setStatus] = useState(null)
   const [fehler, setFehler] = useState(null)
+  const [ladend, setLadend] = useState(false)
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -31,23 +33,32 @@ function Registrierung({ inviteCode }) {
       return
     }
 
+    if (email.trim().toLowerCase() !== emailWiederholung.trim().toLowerCase()) {
+      setFehler('Die beiden E-Mail-Adressen stimmen nicht überein.')
+      return
+    }
+
+    if (passwort !== passwortWiederholung) {
+      setFehler('Die beiden Passwörter stimmen nicht überein.')
+      return
+    }
+
+    setLadend(true)
     const { error } = await supabase.auth.signUp({
-      email,
+      email: email.trim(),
       password: passwort,
       options: {
         data: { vorname, nachname, telefonnummer, invite_code: inviteCode }
       }
     })
+    setLadend(false)
 
     if (error) {
       setFehler(error.message)
       return
     }
-    setStatus('Fast geschafft! Bitte bestätige deine E-Mail über den Link, den wir dir gerade geschickt haben.')
-  }
-
-  if (status) {
-    return <div style={pageStyle}><h2>📧 {status}</h2></div>
+    // Kein Bestätigungs-Schritt nötig - App.jsx erkennt die neue Sitzung automatisch
+    // und zeigt das Dashboard.
   }
 
   return (
@@ -57,8 +68,10 @@ function Registrierung({ inviteCode }) {
         <input placeholder="Vorname" value={vorname} onChange={e => setVorname(e.target.value)} required />
         <input placeholder="Nachname" value={nachname} onChange={e => setNachname(e.target.value)} required />
         <input type="email" placeholder="E-Mail" value={email} onChange={e => setEmail(e.target.value)} required />
+        <input type="email" placeholder="E-Mail wiederholen" value={emailWiederholung} onChange={e => setEmailWiederholung(e.target.value)} required />
         <input placeholder="Telefonnummer (optional)" value={telefonnummer} onChange={e => setTelefonnummer(e.target.value)} />
         <input type="password" placeholder="Passwort" value={passwort} onChange={e => setPasswort(e.target.value)} required minLength={6} />
+        <input type="password" placeholder="Passwort wiederholen" value={passwortWiederholung} onChange={e => setPasswortWiederholung(e.target.value)} required minLength={6} />
         <label style={{ fontSize: 13, textAlign: 'left' }}>
           <input type="checkbox" checked={datenschutz} onChange={e => setDatenschutz(e.target.checked)} />{' '}
           Ich akzeptiere die <a href="/datenschutz.html" target="_blank" rel="noreferrer">Datenschutzerklärung</a>
@@ -68,10 +81,12 @@ function Registrierung({ inviteCode }) {
           Ich akzeptiere die <a href="/nutzungsbedingungen.html" target="_blank" rel="noreferrer">Nutzungsbedingungen</a>
         </label>
         {fehler && <p style={{ color: '#c0392b' }}>{fehler}</p>}
-        <button type="submit" style={buttonStyle}>Registrieren</button>
+        <button type="submit" style={buttonStyle} disabled={ladend}>
+          {ladend ? 'Einen Moment...' : 'Registrieren'}
+        </button>
       </form>
     </div>
   )
 }
 
-export default Registrierung
+export default Registrierung 
