@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
 import BottomNav from './BottomNav'
@@ -342,6 +343,9 @@ function Spiele({ session }) {
                       ❌ Absage
                     </button>
                     {!meineVerfuegbarkeiten[s.id] && <span style={{ fontSize: 11.5, color: '#5B6D66' }}>noch offen</span>}
+                    <Link to={`/spiele/${s.id}/aufstellung`} style={{ ...smallButtonStyle, textDecoration: 'none', display: 'inline-block' }}>
+                      📋 Aufstellung
+                    </Link>
                   </div>
                 )}
 
