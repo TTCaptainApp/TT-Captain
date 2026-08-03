@@ -51,7 +51,7 @@ function Spiele({ session }) {
   const [bStatus, setBStatus] = useState('geplant')
 
   const ladeSpiele = async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('spiele')
       .select(`
         id,
@@ -68,7 +68,7 @@ function Spiele({ session }) {
           veroeffentlicht,
           aufstellung_spieler (
             position,
-            benutzer:benutzer_id (
+            benutzer (
               vorname,
               nachname,
               qttr
@@ -77,6 +77,10 @@ function Spiele({ session }) {
         )
       `)
       .order('datum')
+
+    if (error) {
+      console.error('Fehler beim Laden der Spiele:', error)
+    }
     setSpiele(data || [])
   }
 
@@ -312,7 +316,15 @@ function Spiele({ session }) {
         )}
 
         {spiele.map(s => {
-          const veroeffentlichteAufstellung = (s.aufstellungen || []).find(a => a.veroeffentlicht)
+          // Sicheres Auslesen: Supabase liefert bei 1:1 Bezeichnungen teilweise Objekte statt Arrays
+          let veroeffentlichteAufstellung = null
+          if (Array.isArray(s.aufstellungen)) {
+            veroeffentlichteAufstellung = s.aufstellungen.find(a => a?.veroeffentlicht)
+          } else if (s.aufstellungen && typeof s.aufstellungen === 'object') {
+            if (s.aufstellungen.veroeffentlicht) {
+              veroeffentlichteAufstellung = s.aufstellungen
+            }
+          }
 
           return (
             <div key={s.id} style={cardStyle}>
@@ -368,16 +380,19 @@ function Spiele({ session }) {
                         {(veroeffentlichteAufstellung.aufstellung_spieler || [])
                           .slice()
                           .sort((a, b) => a.position - b.position)
-                          .map((asp) => (
-                            <div key={asp.position} style={{ fontSize: 13, color: '#16261F' }}>
-                              <strong>{asp.position}.</strong> {asp.benutzer?.vorname} {asp.benutzer?.nachname}
-                              {asp.benutzer?.qttr && (
-                                <span style={{ fontSize: 11, color: '#5B6D66', marginLeft: 4 }}>
-                                  ({asp.benutzer.qttr} QTTR)
-                                </span>
-                              )}
-                            </div>
-                          ))}
+                          .map((asp) => {
+                            const b = Array.isArray(asp.benutzer) ? asp.benutzer[0] : asp.benutzer
+                            return (
+                              <div key={asp.position} style={{ fontSize: 13, color: '#16261F' }}>
+                                <strong>{asp.position}.</strong> {b?.vorname} {b?.nachname}
+                                {b?.qttr && (
+                                  <span style={{ fontSize: 11, color: '#5B6D66', marginLeft: 4 }}>
+                                    ({b.qttr} QTTR)
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })}
                       </div>
                     </div>
                   )}
