@@ -1,4 +1,4 @@
- import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
 import BottomNav from './BottomNav'
@@ -8,10 +8,13 @@ const smallButtonStyle = {
   cursor: 'pointer', border: '1px solid #DCE7E2', background: 'white', color: '#16261F'
 }
 
+const ANZAHL_SICHTBAR = 2
+
 function Dashboard({ session }) {
   const [vorname, setVorname] = useState('')
   const [istAdmin, setIstAdmin] = useState(false)
   const [offeneSpiele, setOffeneSpiele] = useState([])
+  const [alleAnzeigen, setAlleAnzeigen] = useState(false)
 
   const ladeOffeneSpiele = async () => {
     const { data: zuordnungen } = await supabase
@@ -59,6 +62,9 @@ function Dashboard({ session }) {
     ladeOffeneSpiele()
   }
 
+  const sichtbareSpiele = alleAnzeigen ? offeneSpiele : offeneSpiele.slice(0, ANZAHL_SICHTBAR)
+  const versteckteAnzahl = offeneSpiele.length - sichtbareSpiele.length
+
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
       <div style={{ padding: '18px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff' }}>
@@ -85,7 +91,7 @@ function Dashboard({ session }) {
               ⚠ Offene Rückmeldungen ({offeneSpiele.length})
             </div>
 
-            {offeneSpiele.map(s => (
+            {sichtbareSpiele.map(s => (
               <div key={s.id} style={{ padding: '10px 0', borderTop: '1px solid #DCE7E2' }}>
                 <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>
                   {s.heim_oder_auswaerts === 'heim'
@@ -105,6 +111,29 @@ function Dashboard({ session }) {
                 </div>
               </div>
             ))}
+
+            {versteckteAnzahl > 0 && (
+              <button
+                onClick={() => setAlleAnzeigen(true)}
+                style={{
+                  marginTop: 8, background: 'none', border: 'none', color: '#1C8A4E',
+                  fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0
+                }}
+              >
+                + {versteckteAnzahl} weitere anzeigen
+              </button>
+            )}
+            {alleAnzeigen && offeneSpiele.length > ANZAHL_SICHTBAR && (
+              <button
+                onClick={() => setAlleAnzeigen(false)}
+                style={{
+                  marginTop: 8, background: 'none', border: 'none', color: '#5B6D66',
+                  fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0
+                }}
+              >
+                Weniger anzeigen
+              </button>
+            )}
           </div>
         )}
 
