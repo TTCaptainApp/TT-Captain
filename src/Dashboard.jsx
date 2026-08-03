@@ -1,12 +1,8 @@
-import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+ import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
+import BottomNav from './BottomNav'
 
-const navLinkStyle = {
-  fontFamily: 'Inter, sans-serif', fontSize: 13, fontWeight: 600,
-  color: '#1C8A4E', textDecoration: 'none'
-}
 const smallButtonStyle = {
   padding: '6px 12px', fontSize: 12.5, fontWeight: 600, borderRadius: 7,
   cursor: 'pointer', border: '1px solid #DCE7E2', background: 'white', color: '#16261F'
@@ -65,18 +61,11 @@ function Dashboard({ session }) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
-      <div style={{
-        padding: '18px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff',
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12
-      }}>
+      <div style={{ padding: '18px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff' }}>
         <Brand size={16} />
-        <div style={{ display: 'flex', gap: 16 }}>
-          <Link to="/spiele" style={navLinkStyle}>Spiele</Link>
-          {istAdmin && <Link to="/mannschaften" style={navLinkStyle}>Mannschaften</Link>}
-        </div>
       </div>
 
-      <div style={{ padding: 20, maxWidth: 420, margin: '0 auto' }}>
+      <div style={{ padding: '20px 20px 80px', maxWidth: 420, margin: '0 auto' }}>
         <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 22, margin: '12px 0 4px' }}>
           Hallo {vorname || ''} 👋
         </h1>
@@ -107,16 +96,10 @@ function Dashboard({ session }) {
                   {s.datum} {s.uhrzeit ? `· ${s.uhrzeit.slice(0, 5)} Uhr` : ''}
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  <button
-                    onClick={() => zusageSetzen(s.id, 'zugesagt')}
-                    style={{ ...smallButtonStyle, borderColor: '#1C8A4E', color: '#1C8A4E' }}
-                  >
+                  <button onClick={() => zusageSetzen(s.id, 'zugesagt')} style={{ ...smallButtonStyle, borderColor: '#1C8A4E', color: '#1C8A4E' }}>
                     ✅ Zusage
                   </button>
-                  <button
-                    onClick={() => zusageSetzen(s.id, 'abgesagt')}
-                    style={{ ...smallButtonStyle, borderColor: '#c0392b', color: '#c0392b' }}
-                  >
+                  <button onClick={() => zusageSetzen(s.id, 'abgesagt')} style={{ ...smallButtonStyle, borderColor: '#c0392b', color: '#c0392b' }}>
                     ❌ Absage
                   </button>
                 </div>
@@ -125,10 +108,7 @@ function Dashboard({ session }) {
           </div>
         )}
 
-        <div style={{
-          background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 16,
-          padding: '20px 18px', marginBottom: 16
-        }}>
+        <div style={{ background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 16, padding: '20px 18px', marginBottom: 16 }}>
           <div style={{
             fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700,
             letterSpacing: '.06em', textTransform: 'uppercase', color: '#23D2A0', marginBottom: 6
@@ -151,6 +131,8 @@ function Dashboard({ session }) {
           Abmelden
         </button>
       </div>
+
+      <BottomNav istAdmin={istAdmin} />
     </div>
   )
 }
