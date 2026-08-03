@@ -12,6 +12,8 @@ const smallIconButtonStyle = {
   cursor: 'pointer', fontSize: 14, display: 'flex', alignItems: 'center', justifyContent: 'center'
 }
 
+const anfrageStatusFarbe = { angefragt: '#d4a017', zugesagt: '#1C8A4E', abgelehnt: '#c0392b' }
+
 function Aufstellung({ session }) {
   const { spielId } = useParams()
   const [istAdmin, setIstAdmin] = useState(false)
@@ -19,11 +21,15 @@ function Aufstellung({ session }) {
   const [kannBearbeiten, setKannBearbeiten] = useState(false)
   const [aufstellungId, setAufstellungId] = useState(null)
   const [veroeffentlicht, setVeroeffentlicht] = useState(false)
-  const [ausgewaehlt, setAusgewaehlt] = useState([]) // [{benutzer_id, name, qttr}]
-  const [verfuegbareSpieler, setVerfuegbareSpieler] = useState([]) // [{benutzer_id, name, qttr}]
+  const [ausgewaehlt, setAusgewaehlt] = useState([])
+  const [verfuegbareSpieler, setVerfuegbareSpieler] = useState([])
   const [ladend, setLadend] = useState(true)
   const [fehler, setFehler] = useState(null)
   const [hinweis, setHinweis] = useState(null)
+
+  const [ersatzsucheOffen, setErsatzsucheOffen] = useState(false)
+  const [vereinsmitglieder, setVereinsmitglieder] = useState([])
+  const [ersatzanfragen, setErsatzanfragen] = useState([])
 
   const laden = async () => {
     setLadend(true)
@@ -51,7 +57,6 @@ function Aufstellung({ session }) {
     }
     setKannBearbeiten(darfBearbeiten)
 
-    // Namenslexikon für alle Teamkollegen
     const { data: namen } = await supabase.rpc('teamkollegen_namen')
     const namenLexikon = Object.fromEntries((namen || []).map(n => [n.id, `${n.vorname} ${n.nachname}`]))
 
@@ -61,17 +66,10 @@ function Aufstellung({ session }) {
       setVeroeffentlicht(auf.veroeffentlicht)
       const { data: spielerRows } = await supabase
         .from('aufstellung_spieler')
-        .select('benutzer_id, position, benutzer:benutzer_id(vorname, nachname, qttr)')
+        .select('benutzer_id, position')
         .eq('aufstellung_id', auf.id)
         .order('position')
-      setAusgewaehlt((spielerRows || []).map(r => {
-        const b = r.benutzer
-        return {
-          benutzer_id: r.benutzer_id,
-          name: b ? `${b.vorname} ${b.nachname}` : (namenLexikon[r.benutzer_id] || '?'),
-          qttr: b?.qttr ?? null
-        }
-      }))
+      setAusgewaehlt((spielerRows || []).map(r => ({ benutzer_id: r.benutzer_id, name: namenLexikon[r.benutzer_id] || '?' })))
     } else {
       setAufstellungId(null)
       setVeroeffentlicht(false)
@@ -79,26 +77,21 @@ function Aufstellung({ session }) {
     }
 
     if (darfBearbeiten) {
-      // Lädt zugesagte Spieler inklusive Profil-Details
       const { data: verf } = await supabase
         .from('verfuegbarkeiten')
-        .select('benutzer_id, benutzer:benutzer_id(vorname, nachname, qttr)')
+        .select('benutzer_id')
         .eq('spiel_id', spielId)
         .eq('status', 'zugesagt')
+      setVerfuegbareSpieler((verf || []).map(v => ({ benutzer_id: v.benutzer_id, name: namenLexikon[v.benutzer_id] || '?' })))
 
-      // Sortiert die zugesagten Spieler absteigend nach QTTR (Höchster QTTR zuerst)
-      const sortiert = (verf || [])
-        .map(v => {
-          const b = v.benutzer
-          return {
-            benutzer_id: v.benutzer_id,
-            name: b ? `${b.vorname} ${b.nachname}` : (namenLexikon[v.benutzer_id] || '?'),
-            qttr: b?.qttr ?? null
-          }
-        })
-        .sort((a, b) => (b.qttr ?? -1) - (a.qttr ?? -1))
+      const { data: mitglieder } = await supabase.rpc('vereinsmitglieder_ersatzsuche')
+      setVereinsmitglieder((mitglieder || []).sort((a, b) => (b.qttr || 0) - (a.qttr || 0)))
 
-      setVerfuegbareSpieler(sortiert)
+      const { data: anfragenRows } = await supabase
+        .from('ersatzanfragen')
+        .select('id, angefragter_benutzer_id, status')
+        .eq('spiel_id', spielId)
+      setErsatzanfragen((anfragenRows || []).map(a => ({ ...a, name: namenLexikon[a.angefragter_benutzer_id] || '?' })))
     }
 
     setLadend(false)
@@ -170,7 +163,28 @@ function Aufstellung({ session }) {
     }
   }
 
+  const ersatzspielerAnfragen = async (benutzerId) => {
+    setFehler(null)
+    const { error } = await supabase.from('ersatzanfragen').insert({
+      spiel_id: spielId,
+      angefragter_benutzer_id: benutzerId,
+      angefragt_von: session.user.id
+    })
+    if (error) { setFehler(error.message); return }
+    laden()
+  }
+
   if (ladend) return null
+
+  const bereitsAngefragtIds = new Set(
+    ersatzanfragen.filter(a => a.status === 'angefragt' || a.status === 'zugesagt').map(a => a.angefragter_benutzer_id)
+  )
+  const kandidaten = vereinsmitglieder.filter(m =>
+    !ausgewaehlt.some(a => a.benutzer_id === m.id) &&
+    !verfuegbareSpieler.some(v => v.benutzer_id === m.id) &&
+    !bereitsAngefragtIds.has(m.id) &&
+    m.id !== session.user.id
+  )
 
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
@@ -208,7 +222,7 @@ function Aufstellung({ session }) {
           <div style={cardStyle}>
             {ausgewaehlt.map((a, i) => (
               <div key={a.benutzer_id} style={{ padding: '8px 0', borderTop: i > 0 ? '1px solid #DCE7E2' : 'none', fontSize: 14 }}>
-                <strong>{i + 1}.</strong> {a.name} {a.qttr ? <span style={{ fontSize: 12, color: '#5B6D66', marginLeft: 6 }}>({a.qttr} QTTR)</span> : ''}
+                <strong>{i + 1}.</strong> {a.name}
               </div>
             ))}
           </div>
@@ -228,9 +242,7 @@ function Aufstellung({ session }) {
                   display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0',
                   borderTop: i > 0 ? '1px solid #DCE7E2' : 'none'
                 }}>
-                  <span style={{ fontSize: 14, flex: 1 }}>
-                    <strong>{i + 1}.</strong> {a.name} {a.qttr ? <span style={{ fontSize: 12, color: '#5B6D66', marginLeft: 4 }}>({a.qttr})</span> : ''}
-                  </span>
+                  <span style={{ fontSize: 14, flex: 1 }}><strong>{i + 1}.</strong> {a.name}</span>
                   <button style={smallIconButtonStyle} onClick={() => nachObenVerschieben(i)} disabled={i === 0}>▲</button>
                   <button style={smallIconButtonStyle} onClick={() => nachUntenVerschieben(i)} disabled={i === ausgewaehlt.length - 1}>▼</button>
                   <button style={{ ...smallIconButtonStyle, color: '#c0392b' }} onClick={() => spielerEntfernen(a.benutzer_id)}>✕</button>
@@ -249,12 +261,48 @@ function Aufstellung({ session }) {
                 .filter(v => !ausgewaehlt.some(a => a.benutzer_id === v.benutzer_id))
                 .map(v => (
                   <div key={v.benutzer_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
-                    <span style={{ fontSize: 14 }}>
-                      {v.name} {v.qttr ? <span style={{ fontSize: 12, color: '#5B6D66', marginLeft: 6 }}>({v.qttr} QTTR)</span> : ''}
-                    </span>
+                    <span style={{ fontSize: 14 }}>{v.name}</span>
                     <button style={secondaryButtonStyle} onClick={() => spielerHinzufuegen(v)}>+ Hinzufügen</button>
                   </div>
                 ))}
+            </div>
+
+            <div style={cardStyle}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>
+                  🔍 Ersatzspieler
+                </div>
+                <button style={secondaryButtonStyle} onClick={() => setErsatzsucheOffen(o => !o)}>
+                  {ersatzsucheOffen ? 'Schließen' : 'Suchen'}
+                </button>
+              </div>
+
+              {ersatzanfragen.length > 0 && (
+                <div style={{ marginBottom: ersatzsucheOffen ? 12 : 0 }}>
+                  {ersatzanfragen.map(a => (
+                    <div key={a.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '4px 0', fontSize: 13 }}>
+                      <span>{a.name}</span>
+                      <span style={{ color: anfrageStatusFarbe[a.status], fontWeight: 700, textTransform: 'uppercase', fontSize: 11 }}>
+                        {a.status}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {ersatzsucheOffen && (
+                <>
+                  {kandidaten.length === 0 && (
+                    <p style={{ fontSize: 13, color: '#5B6D66', margin: 0 }}>Keine weiteren Vereinsmitglieder verfügbar.</p>
+                  )}
+                  {kandidaten.map(k => (
+                    <div key={k.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
+                      <span style={{ fontSize: 14 }}>{k.vorname} {k.nachname} <span style={{ color: '#5B6D66', fontSize: 12.5 }}>({k.qttr ?? '–'} QTTR)</span></span>
+                      <button style={secondaryButtonStyle} onClick={() => ersatzspielerAnfragen(k.id)}>Anfragen</button>
+                    </div>
+                  ))}
+                </>
+              )}
             </div>
 
             {fehler && <p style={{ color: '#c0392b', fontSize: 13 }}>{fehler}</p>}
