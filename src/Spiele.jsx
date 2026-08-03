@@ -53,7 +53,29 @@ function Spiele({ session }) {
   const ladeSpiele = async () => {
     const { data } = await supabase
       .from('spiele')
-      .select('id, mannschaft_id, gegner, heim_oder_auswaerts, datum, uhrzeit, halle, status, mannschaften(name)')
+      .select(`
+        id,
+        mannschaft_id,
+        gegner,
+        heim_oder_auswaerts,
+        datum,
+        uhrzeit,
+        halle,
+        status,
+        mannschaften(name),
+        aufstellungen (
+          id,
+          veroeffentlicht,
+          aufstellung_spieler (
+            position,
+            benutzer (
+              vorname,
+              nachname,
+              qttr
+            )
+          )
+        )
+      `)
       .order('datum')
     setSpiele(data || [])
   }
@@ -289,82 +311,115 @@ function Spiele({ session }) {
           </form>
         )}
 
-        {spiele.map(s => (
-          <div key={s.id} style={cardStyle}>
-            {bearbeitenId === s.id ? (
-              <form onSubmit={bearbeitenSpeichern} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                <input style={inputStyle} value={bGegner} onChange={e => setBGegner(e.target.value)} placeholder="Gegner" />
-                <select style={inputStyle} value={bHeimAuswaerts} onChange={e => setBHeimAuswaerts(e.target.value)}>
-                  <option value="heim">Heim</option>
-                  <option value="auswaerts">Auswärts</option>
-                </select>
-                <input style={inputStyle} type="date" value={bDatum} onChange={e => setBDatum(e.target.value)} />
-                <input style={inputStyle} type="time" value={bUhrzeit} onChange={e => setBUhrzeit(e.target.value)} />
-                <input style={inputStyle} value={bHalle} onChange={e => setBHalle(e.target.value)} placeholder="Halle" />
-                <select style={inputStyle} value={bStatus} onChange={e => setBStatus(e.target.value)}>
-                  <option value="geplant">Geplant</option>
-                  <option value="verlegt">Verlegt</option>
-                  <option value="abgesagt">Abgesagt</option>
-                  <option value="gespielt">Gespielt</option>
-                </select>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <button type="submit" style={buttonStyle}>Speichern</button>
-                  <button type="button" style={secondaryButtonStyle} onClick={() => setBearbeitenId(null)}>Abbrechen</button>
-                </div>
-              </form>
-            ) : (
-              <>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>
-                    {s.heim_oder_auswaerts === 'heim'
-                      ? `${s.mannschaften?.name} vs. ${s.gegner}`
-                      : `${s.gegner} vs. ${s.mannschaften?.name}`}
-                  </span>
-                  <span style={{ fontSize: 11, fontWeight: 700, color: statusFarbe[s.status] || '#5B6D66', textTransform: 'uppercase' }}>
-                    {s.status}
-                  </span>
-                </div>
-                <div style={{ fontSize: 13, color: '#5B6D66', marginTop: 4 }}>
-                  {s.datum} {s.uhrzeit ? `· ${s.uhrzeit.slice(0, 5)} Uhr` : ''} {s.halle ? `· ${s.halle}` : ''} · {s.heim_oder_auswaerts === 'heim' ? 'Heimspiel' : 'Auswärts'}
-                </div>
+        {spiele.map(s => {
+          const veroeffentlichteAufstellung = s.aufstellungen?.[0]?.veroeffentlicht ? s.aufstellungen[0] : null
 
-                {mannschaftIdsMeine.has(s.mannschaft_id) && (
-                  <div style={{ display: 'flex', gap: 6, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-                    <button
-                      onClick={() => zusageSetzen(s.id, 'zugesagt')}
-                      style={{ ...smallButtonStyle, background: meineVerfuegbarkeiten[s.id] === 'zugesagt' ? '#1C8A4E' : 'white', color: meineVerfuegbarkeiten[s.id] === 'zugesagt' ? 'white' : '#16261F', borderColor: '#1C8A4E' }}
-                    >
-                      ✅ Zusage
-                    </button>
-                    <button
-                      onClick={() => zusageSetzen(s.id, 'abgesagt')}
-                      style={{ ...smallButtonStyle, background: meineVerfuegbarkeiten[s.id] === 'abgesagt' ? '#c0392b' : 'white', color: meineVerfuegbarkeiten[s.id] === 'abgesagt' ? 'white' : '#16261F', borderColor: '#c0392b' }}
-                    >
-                      ❌ Absage
-                    </button>
-                    {!meineVerfuegbarkeiten[s.id] && <span style={{ fontSize: 11.5, color: '#5B6D66' }}>noch offen</span>}
-                    <Link to={`/spiele/${s.id}/aufstellung`} style={{ ...smallButtonStyle, textDecoration: 'none', display: 'inline-block' }}>
-                      📋 Aufstellung
-                    </Link>
+          return (
+            <div key={s.id} style={cardStyle}>
+              {bearbeitenId === s.id ? (
+                <form onSubmit={bearbeitenSpeichern} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  <input style={inputStyle} value={bGegner} onChange={e => setBGegner(e.target.value)} placeholder="Gegner" />
+                  <select style={inputStyle} value={bHeimAuswaerts} onChange={e => setBHeimAuswaerts(e.target.value)}>
+                    <option value="heim">Heim</option>
+                    <option value="auswaerts">Auswärts</option>
+                  </select>
+                  <input style={inputStyle} type="date" value={bDatum} onChange={e => setBDatum(e.target.value)} />
+                  <input style={inputStyle} type="time" value={bUhrzeit} onChange={e => setBUhrzeit(e.target.value)} />
+                  <input style={inputStyle} value={bHalle} onChange={e => setBHalle(e.target.value)} placeholder="Halle" />
+                  <select style={inputStyle} value={bStatus} onChange={e => setBStatus(e.target.value)}>
+                    <option value="geplant">Geplant</option>
+                    <option value="verlegt">Verlegt</option>
+                    <option value="abgesagt">Abgesagt</option>
+                    <option value="gespielt">Gespielt</option>
+                  </select>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    <button type="submit" style={buttonStyle}>Speichern</button>
+                    <button type="button" style={secondaryButtonStyle} onClick={() => setBearbeitenId(null)}>Abbrechen</button>
                   </div>
-                )}
+                </form>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>
+                      {s.heim_oder_auswaerts === 'heim'
+                        ? `${s.mannschaften?.name} vs. ${s.gegner}`
+                        : `${s.gegner} vs. ${s.mannschaften?.name}`}
+                    </span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: statusFarbe[s.status] || '#5B6D66', textTransform: 'uppercase' }}>
+                      {s.status}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13, color: '#5B6D66', marginTop: 4 }}>
+                    {s.datum} {s.uhrzeit ? `· ${s.uhrzeit.slice(0, 5)} Uhr` : ''} {s.halle ? `· ${s.halle}` : ''} · {s.heim_oder_auswaerts === 'heim' ? 'Heimspiel' : 'Auswärts'}
+                  </div>
 
-                {kannBearbeiten(s.mannschaft_id) && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
-                    {verfuegbarkeitCounts[s.id] && (
-                      <span style={{ fontSize: 11.5, color: '#5B6D66' }}>
-                        ✅ {verfuegbarkeitCounts[s.id].zugesagt || 0} · ❌ {verfuegbarkeitCounts[s.id].abgesagt || 0} · ❓ {verfuegbarkeitCounts[s.id].offen || 0}
-                      </span>
-                    )}
-                    <button onClick={() => bearbeitenStarten(s)} style={{ ...smallButtonStyle, borderColor: '#DCE7E2', color: '#1C8A4E' }}>
-                      ✏️ Bearbeiten
-                    </button>
-                  </div>
-                )}
-              </>
-            )}
-          </div>
-        ))}
+                  {veroeffentlichteAufstellung && (
+                    <div style={{
+                      marginTop: 10,
+                      padding: '10px 12px',
+                      background: '#F0F7F4',
+                      border: '1px solid #DCE7E2',
+                      borderRadius: 8
+                    }}>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#1C8A4E', marginBottom: 6 }}>
+                        📋 Aufstellung:
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                        {(veroeffentlichteAufstellung.aufstellung_spieler || [])
+                          .slice()
+                          .sort((a, b) => a.position - b.position)
+                          .map((asp) => (
+                            <div key={asp.position} style={{ fontSize: 13, color: '#16261F' }}>
+                              <strong>{asp.position}.</strong> {asp.benutzer?.vorname} {asp.benutzer?.nachname}
+                              {asp.benutzer?.qttr && (
+                                <span style={{ fontSize: 11, color: '#5B6D66', marginLeft: 4 }}>
+                                  ({asp.benutzer.qttr} QTTR)
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {mannschaftIdsMeine.has(s.mannschaft_id) && (
+                    <div style={{ display: 'flex', gap: 6, marginTop: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => zusageSetzen(s.id, 'zugesagt')}
+                        style={{ ...smallButtonStyle, background: meineVerfuegbarkeiten[s.id] === 'zugesagt' ? '#1C8A4E' : 'white', color: meineVerfuegbarkeiten[s.id] === 'zugesagt' ? 'white' : '#16261F', borderColor: '#1C8A4E' }}
+                      >
+                        ✅ Zusage
+                      </button>
+                      <button
+                        onClick={() => zusageSetzen(s.id, 'abgesagt')}
+                        style={{ ...smallButtonStyle, background: meineVerfuegbarkeiten[s.id] === 'abgesagt' ? '#c0392b' : 'white', color: meineVerfuegbarkeiten[s.id] === 'abgesagt' ? 'white' : '#16261F', borderColor: '#c0392b' }}
+                      >
+                        ❌ Absage
+                      </button>
+                      {!meineVerfuegbarkeiten[s.id] && <span style={{ fontSize: 11.5, color: '#5B6D66' }}>noch offen</span>}
+                      <Link to={`/spiele/${s.id}/aufstellung`} style={{ ...smallButtonStyle, textDecoration: 'none', display: 'inline-block' }}>
+                        📋 Aufstellung
+                      </Link>
+                    </div>
+                  )}
+
+                  {kannBearbeiten(s.mannschaft_id) && (
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                      {verfuegbarkeitCounts[s.id] && (
+                        <span style={{ fontSize: 11.5, color: '#5B6D66' }}>
+                          ✅ {verfuegbarkeitCounts[s.id].zugesagt || 0} · ❌ {verfuegbarkeitCounts[s.id].abgesagt || 0} · ❓ {verfuegbarkeitCounts[s.id].offen || 0}
+                        </span>
+                      )}
+                      <button onClick={() => bearbeitenStarten(s)} style={{ ...smallButtonStyle, borderColor: '#DCE7E2', color: '#1C8A4E' }}>
+                        ✏️ Bearbeiten
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          )
+        })}
 
         {spiele.length === 0 && <p style={{ color: '#5B6D66', fontSize: 14 }}>Noch keine Spiele eingetragen.</p>}
       </div>
