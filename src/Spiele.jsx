@@ -68,7 +68,7 @@ function Spiele({ session }) {
           veroeffentlicht,
           aufstellung_spieler (
             position,
-            benutzer (
+            benutzer:benutzer_id (
               vorname,
               nachname,
               qttr
@@ -312,7 +312,7 @@ function Spiele({ session }) {
         )}
 
         {spiele.map(s => {
-          const veroeffentlichteAufstellung = s.aufstellungen?.[0]?.veroeffentlicht ? s.aufstellungen[0] : null
+          const veroeffentlichteAufstellung = (s.aufstellungen || []).find(a => a.veroeffentlicht)
 
           return (
             <div key={s.id} style={cardStyle}>
