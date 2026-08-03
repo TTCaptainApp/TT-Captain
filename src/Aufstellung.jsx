@@ -19,8 +19,8 @@ function Aufstellung({ session }) {
   const [kannBearbeiten, setKannBearbeiten] = useState(false)
   const [aufstellungId, setAufstellungId] = useState(null)
   const [veroeffentlicht, setVeroeffentlicht] = useState(false)
-  const [ausgewaehlt, setAusgewaehlt] = useState([]) // [{benutzer_id, name}]
-  const [verfuegbareSpieler, setVerfuegbareSpieler] = useState([]) // [{benutzer_id, name}]
+  const [ausgewaehlt, setAusgewaehlt] = useState([]) // [{benutzer_id, name, qttr}]
+  const [verfuegbareSpieler, setVerfuegbareSpieler] = useState([]) // [{benutzer_id, name, qttr}]
   const [ladend, setLadend] = useState(true)
   const [fehler, setFehler] = useState(null)
   const [hinweis, setHinweis] = useState(null)
@@ -51,7 +51,7 @@ function Aufstellung({ session }) {
     }
     setKannBearbeiten(darfBearbeiten)
 
-    // Namenslexikon für alle Teamkollegen (nur Vor-/Nachname, siehe Sprint-4-SQL)
+    // Namenslexikon für alle Teamkollegen
     const { data: namen } = await supabase.rpc('teamkollegen_namen')
     const namenLexikon = Object.fromEntries((namen || []).map(n => [n.id, `${n.vorname} ${n.nachname}`]))
 
@@ -61,10 +61,17 @@ function Aufstellung({ session }) {
       setVeroeffentlicht(auf.veroeffentlicht)
       const { data: spielerRows } = await supabase
         .from('aufstellung_spieler')
-        .select('benutzer_id, position')
+        .select('benutzer_id, position, benutzer:benutzer_id(vorname, nachname, qttr)')
         .eq('aufstellung_id', auf.id)
         .order('position')
-      setAusgewaehlt((spielerRows || []).map(r => ({ benutzer_id: r.benutzer_id, name: namenLexikon[r.benutzer_id] || '?' })))
+      setAusgewaehlt((spielerRows || []).map(r => {
+        const b = r.benutzer
+        return {
+          benutzer_id: r.benutzer_id,
+          name: b ? `${b.vorname} ${b.nachname}` : (namenLexikon[r.benutzer_id] || '?'),
+          qttr: b?.qttr ?? null
+        }
+      }))
     } else {
       setAufstellungId(null)
       setVeroeffentlicht(false)
@@ -72,12 +79,26 @@ function Aufstellung({ session }) {
     }
 
     if (darfBearbeiten) {
+      // Lädt zugesagte Spieler inklusive Profil-Details
       const { data: verf } = await supabase
         .from('verfuegbarkeiten')
-        .select('benutzer_id')
+        .select('benutzer_id, benutzer:benutzer_id(vorname, nachname, qttr)')
         .eq('spiel_id', spielId)
         .eq('status', 'zugesagt')
-      setVerfuegbareSpieler((verf || []).map(v => ({ benutzer_id: v.benutzer_id, name: namenLexikon[v.benutzer_id] || '?' })))
+
+      // Sortiert die zugesagten Spieler absteigend nach QTTR (Höchster QTTR zuerst)
+      const sortiert = (verf || [])
+        .map(v => {
+          const b = v.benutzer
+          return {
+            benutzer_id: v.benutzer_id,
+            name: b ? `${b.vorname} ${b.nachname}` : (namenLexikon[v.benutzer_id] || '?'),
+            qttr: b?.qttr ?? null
+          }
+        })
+        .sort((a, b) => (b.qttr ?? -1) - (a.qttr ?? -1))
+
+      setVerfuegbareSpieler(sortiert)
     }
 
     setLadend(false)
@@ -187,7 +208,7 @@ function Aufstellung({ session }) {
           <div style={cardStyle}>
             {ausgewaehlt.map((a, i) => (
               <div key={a.benutzer_id} style={{ padding: '8px 0', borderTop: i > 0 ? '1px solid #DCE7E2' : 'none', fontSize: 14 }}>
-                <strong>{i + 1}.</strong> {a.name}
+                <strong>{i + 1}.</strong> {a.name} {a.qttr ? <span style={{ fontSize: 12, color: '#5B6D66', marginLeft: 6 }}>({a.qttr} QTTR)</span> : ''}
               </div>
             ))}
           </div>
@@ -207,7 +228,9 @@ function Aufstellung({ session }) {
                   display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0',
                   borderTop: i > 0 ? '1px solid #DCE7E2' : 'none'
                 }}>
-                  <span style={{ fontSize: 14, flex: 1 }}><strong>{i + 1}.</strong> {a.name}</span>
+                  <span style={{ fontSize: 14, flex: 1 }}>
+                    <strong>{i + 1}.</strong> {a.name} {a.qttr ? <span style={{ fontSize: 12, color: '#5B6D66', marginLeft: 4 }}>({a.qttr})</span> : ''}
+                  </span>
                   <button style={smallIconButtonStyle} onClick={() => nachObenVerschieben(i)} disabled={i === 0}>▲</button>
                   <button style={smallIconButtonStyle} onClick={() => nachUntenVerschieben(i)} disabled={i === ausgewaehlt.length - 1}>▼</button>
                   <button style={{ ...smallIconButtonStyle, color: '#c0392b' }} onClick={() => spielerEntfernen(a.benutzer_id)}>✕</button>
@@ -226,7 +249,9 @@ function Aufstellung({ session }) {
                 .filter(v => !ausgewaehlt.some(a => a.benutzer_id === v.benutzer_id))
                 .map(v => (
                   <div key={v.benutzer_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
-                    <span style={{ fontSize: 14 }}>{v.name}</span>
+                    <span style={{ fontSize: 14 }}>
+                      {v.name} {v.qttr ? <span style={{ fontSize: 12, color: '#5B6D66', marginLeft: 6 }}>({v.qttr} QTTR)</span> : ''}
+                    </span>
                     <button style={secondaryButtonStyle} onClick={() => spielerHinzufuegen(v)}>+ Hinzufügen</button>
                   </div>
                 ))}
