@@ -3,30 +3,251 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Impressum – TT Captain</title>
+
+<title>Impressum | TT Captain</title>
+
 <style>
-  body{font-family:sans-serif;background:#F6FAF8;color:#16261F;max-width:640px;margin:0 auto;padding:32px 20px;line-height:1.6;}
-  h1{color:#1C8A4E;}
-  a{color:#1C8A4E;}
+
+:root{
+    --primary:#f15a24;
+    --primary-dark:#d94f1f;
+    --background:#f5f5f5;
+    --card:#ffffff;
+    --text:#222;
+    --border:#ececec;
+}
+
+*{
+    margin:0;
+    padding:0;
+    box-sizing:border-box;
+}
+
+body{
+    background:var(--background);
+    font-family:Arial,Helvetica,sans-serif;
+    color:var(--text);
+}
+
+header{
+    background:white;
+    padding:22px;
+    text-align:center;
+    border-bottom:1px solid #e8e8e8;
+}
+
+.logo{
+    font-size:34px;
+    margin-bottom:6px;
+}
+
+header h1{
+    color:var(--primary);
+    font-size:28px;
+}
+
+.container{
+    max-width:900px;
+    margin:auto;
+    padding:20px;
+}
+
+.card{
+    background:var(--card);
+    border:2px solid var(--primary);
+    border-radius:20px;
+    padding:24px;
+    margin-bottom:20px;
+}
+
+h2{
+    color:var(--primary);
+    margin-bottom:18px;
+    font-size:22px;
+}
+
+p{
+    line-height:1.8;
+    margin-bottom:14px;
+}
+
+a{
+    color:var(--primary);
+    text-decoration:none;
+}
+
+a:hover{
+    text-decoration:underline;
+}
+
+.button-area{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-top:30px;
+}
+
+.button{
+    flex:1;
+    min-width:170px;
+    text-align:center;
+    background:var(--primary);
+    color:white;
+    padding:14px;
+    border-radius:12px;
+    text-decoration:none;
+    font-weight:bold;
+    transition:.2s;
+}
+
+.button:hover{
+    background:var(--primary-dark);
+    text-decoration:none;
+}
+
+footer{
+    text-align:center;
+    color:#666;
+    padding:25px;
+    font-size:14px;
+}
+
 </style>
+
 </head>
+
 <body>
-  <h1>Impressum</h1>
-  <p><em>TODO: Endgültige Angaben ergänzen, bevor die App öffentlich genutzt wird.</em></p>
 
-  <h2>Angaben gemäß § 5 DDG</h2>
-  <p>
-    [Vor- und Nachname]<br>
-    [Straße und Hausnummer]<br>
-    [PLZ und Ort]
-  </p>
+<header>
 
-  <h2>Kontakt</h2>
-  <p>
-    E-Mail: [E-Mail-Adresse]<br>
-    Telefon: [Telefonnummer]
-  </p>
+<div class="logo">🏓</div>
 
-  <p><a href="/">Zurück zur App</a></p>
+<h1>TT Captain</h1>
+
+</header>
+
+<div class="container">
+
+<div class="card">
+
+<h2>Impressum</h2>
+
+<p>
+Angaben gemäß § 5 Digitale-Dienste-Gesetz (DDG)
+</p>
+
+<p>
+
+Björn Dannowski<br>
+c/o Bohnensack<br>
+Bahnhofstraße 15d<br>
+25421 Pinneberg<br>
+Deutschland
+
+</p>
+
+</div>
+
+<div class="card">
+
+<h2>Kontakt</h2>
+
+<p>
+
+E-Mail:<br>
+
+<a href="mailto:tt-captain@gmx.de">
+tt-captain@gmx.de
+</a>
+
+</p>
+
+</div>
+
+<div class="card">
+
+<h2>Verantwortlich für den Inhalt</h2>
+
+<p>
+
+Verantwortlich gemäß § 18 Abs. 2 MStV:
+
+</p>
+
+<p>
+
+Björn Dannowski<br>
+c/o Bohnensack<br>
+Bahnhofstraße 15d<br>
+25421 Pinneberg
+
+</p>
+
+</div>
+
+<div class="card">
+
+<h2>Haftung für Inhalte</h2>
+
+<p>
+
+Die Inhalte dieser Anwendung wurden mit größtmöglicher Sorgfalt erstellt.
+Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte kann jedoch keine Gewähr übernommen werden.
+
+</p>
+
+</div>
+
+<div class="card">
+
+<h2>Haftung für Links</h2>
+
+<p>
+
+Diese Anwendung enthält gegebenenfalls Links zu externen Webseiten Dritter.
+Für deren Inhalte ist ausschließlich der jeweilige Betreiber verantwortlich.
+Zum Zeitpunkt der Verlinkung waren keine rechtswidrigen Inhalte erkennbar.
+
+</p>
+
+</div>
+
+<div class="card">
+
+<h2>Urheberrecht</h2>
+
+<p>
+
+Alle Inhalte, Bilder, Grafiken, Logos sowie der Quellcode dieser Anwendung unterliegen dem deutschen Urheberrecht.
+Eine Vervielfältigung oder Verwendung außerhalb der gesetzlichen Grenzen bedarf der vorherigen schriftlichen Zustimmung des jeweiligen Rechteinhabers.
+
+</p>
+
+</div>
+
+<div class="button-area">
+
+<a class="button" href="/">
+🏠 Zur Startseite
+</a>
+
+<a class="button" href="/datenschutz.html">
+🔒 Datenschutz
+</a>
+
+<a class="button" href="/nutzungsbedingungen.html">
+📄 Nutzungsbedingungen
+</a>
+
+</div>
+
+</div>
+
+<footer>
+
+© 2026 TT Captain
+
+</footer>
+
 </body>
 </html>
