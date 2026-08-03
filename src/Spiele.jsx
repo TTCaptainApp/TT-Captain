@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
+import BottomNav from './BottomNav'
 import { parseICS, gegnerErmitteln } from './icsParser'
 
 const cardStyle = { background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 14, marginBottom: 10 }
@@ -41,7 +41,6 @@ function Spiele({ session }) {
   const [importFehler, setImportFehler] = useState(null)
   const [importLaeuft, setImportLaeuft] = useState(false)
 
-  // Bearbeiten
   const [bearbeitenId, setBearbeitenId] = useState(null)
   const [bGegner, setBGegner] = useState('')
   const [bHeimAuswaerts, setBHeimAuswaerts] = useState('heim')
@@ -106,7 +105,7 @@ function Spiele({ session }) {
   const spielfuehrerMannschaftIds = new Set(
     meineMannschaften.filter(m => m.rolle === 'spielfuehrer' || m.rolle === 'stellvertreter').map(m => m.mannschaft_id)
   )
-  const kannBearbeiten = (mannschaftId) => istAdmin || spielfuehrerMannschaftIds.has(mannschaftId)
+  const kannBearbeiten = (mId) => istAdmin || spielfuehrerMannschaftIds.has(mId)
 
   const kannSpielAnlegen = istAdmin || spielfuehrerMannschaftIds.size > 0
   const auswahlMannschaften = istAdmin
@@ -177,7 +176,7 @@ function Spiele({ session }) {
   }
 
   const zusageSetzen = async (spielId, status) => {
-    setMeineVerfuegbarkeiten(prev => ({ ...prev, [spielId]: status })) // sofortiges Feedback
+    setMeineVerfuegbarkeiten(prev => ({ ...prev, [spielId]: status }))
     await supabase.from('verfuegbarkeiten').upsert(
       { spiel_id: spielId, benutzer_id: session.user.id, status, geaendert_am: new Date().toISOString() },
       { onConflict: 'spiel_id,benutzer_id' }
@@ -208,12 +207,11 @@ function Spiele({ session }) {
 
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
-      <div style={{ padding: '18px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      <div style={{ padding: '18px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff' }}>
         <Brand size={16} />
-        <Link to="/" style={{ fontSize: 13, color: '#1C8A4E', fontWeight: 600, textDecoration: 'none' }}>← Zurück</Link>
       </div>
 
-      <div style={{ padding: 20, maxWidth: 480, margin: '0 auto' }}>
+      <div style={{ padding: '20px 20px 80px', maxWidth: 480, margin: '0 auto' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', margin: '8px 0 16px', flexWrap: 'wrap', gap: 8 }}>
           <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 20, margin: 0 }}>Spiele</h1>
           {kannSpielAnlegen && (
@@ -366,8 +364,10 @@ function Spiele({ session }) {
 
         {spiele.length === 0 && <p style={{ color: '#5B6D66', fontSize: 14 }}>Noch keine Spiele eingetragen.</p>}
       </div>
+
+      <BottomNav istAdmin={istAdmin} />
     </div>
   )
 }
 
-export default Spiele 
+export default Spiele
