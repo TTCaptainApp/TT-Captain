@@ -15,6 +15,7 @@ function Dashboard({ session }) {
   const [istAdmin, setIstAdmin] = useState(false)
   const [offeneSpiele, setOffeneSpiele] = useState([])
   const [alleAnzeigen, setAlleAnzeigen] = useState(false)
+  const [ersatzanfragen, setErsatzanfragen] = useState([])
 
   const ladeOffeneSpiele = async () => {
     const { data: zuordnungen } = await supabase
@@ -43,6 +44,15 @@ function Dashboard({ session }) {
     setOffeneSpiele(offene)
   }
 
+  const ladeErsatzanfragen = async () => {
+    const { data } = await supabase
+      .from('ersatzanfragen')
+      .select('id, spiel_id, spiele(gegner, heim_oder_auswaerts, datum, uhrzeit, mannschaften(name))')
+      .eq('angefragter_benutzer_id', session.user.id)
+      .eq('status', 'angefragt')
+    setErsatzanfragen(data || [])
+  }
+
   useEffect(() => {
     supabase.from('benutzer').select('vorname, ist_administrator').eq('id', session.user.id).single()
       .then(({ data }) => {
@@ -52,6 +62,7 @@ function Dashboard({ session }) {
         }
       })
     ladeOffeneSpiele()
+    ladeErsatzanfragen()
   }, [session])
 
   const zusageSetzen = async (spielId, status) => {
@@ -60,6 +71,20 @@ function Dashboard({ session }) {
       { onConflict: 'spiel_id,benutzer_id' }
     )
     ladeOffeneSpiele()
+  }
+
+  const ersatzanfrageBeantworten = async (anfrageId, spielId, antwort) => {
+    await supabase.from('ersatzanfragen').update({
+      status: antwort, beantwortet_am: new Date().toISOString()
+    }).eq('id', anfrageId)
+
+    if (antwort === 'zugesagt') {
+      await supabase.from('verfuegbarkeiten').upsert(
+        { spiel_id: spielId, benutzer_id: session.user.id, status: 'zugesagt', geaendert_am: new Date().toISOString() },
+        { onConflict: 'spiel_id,benutzer_id' }
+      )
+    }
+    ladeErsatzanfragen()
   }
 
   const sichtbareSpiele = alleAnzeigen ? offeneSpiele : offeneSpiele.slice(0, ANZAHL_SICHTBAR)
@@ -78,6 +103,40 @@ function Dashboard({ session }) {
         <p style={{ color: '#5B6D66', fontSize: 14, marginBottom: 20 }}>
           Schön, dass du dabei bist.
         </p>
+
+        {ersatzanfragen.length > 0 && (
+          <div style={{
+            background: '#ffffff', border: '2px solid #23D2A0', borderRadius: 16,
+            padding: '18px 16px', marginBottom: 16
+          }}>
+            <div style={{
+              fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700,
+              letterSpacing: '.06em', textTransform: 'uppercase', color: '#146B3B', marginBottom: 10
+            }}>
+              🏓 Ersatzspieler-Anfragen ({ersatzanfragen.length})
+            </div>
+            {ersatzanfragen.map(a => (
+              <div key={a.id} style={{ padding: '10px 0', borderTop: '1px solid #DCE7E2' }}>
+                <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>
+                  {a.spiele?.heim_oder_auswaerts === 'heim'
+                    ? `${a.spiele?.mannschaften?.name} vs. ${a.spiele?.gegner}`
+                    : `${a.spiele?.gegner} vs. ${a.spiele?.mannschaften?.name}`}
+                </div>
+                <div style={{ fontSize: 12.5, color: '#5B6D66', margin: '3px 0 8px' }}>
+                  {a.spiele?.datum} {a.spiele?.uhrzeit ? `· ${a.spiele.uhrzeit.slice(0, 5)} Uhr` : ''}
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => ersatzanfrageBeantworten(a.id, a.spiel_id, 'zugesagt')} style={{ ...smallButtonStyle, borderColor: '#1C8A4E', color: '#1C8A4E' }}>
+                    ✅ Zusage
+                  </button>
+                  <button onClick={() => ersatzanfrageBeantworten(a.id, a.spiel_id, 'abgelehnt')} style={{ ...smallButtonStyle, borderColor: '#c0392b', color: '#c0392b' }}>
+                    ❌ Ablehnen
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {offeneSpiele.length > 0 && (
           <div style={{
@@ -115,10 +174,7 @@ function Dashboard({ session }) {
             {versteckteAnzahl > 0 && (
               <button
                 onClick={() => setAlleAnzeigen(true)}
-                style={{
-                  marginTop: 8, background: 'none', border: 'none', color: '#1C8A4E',
-                  fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0
-                }}
+                style={{ marginTop: 8, background: 'none', border: 'none', color: '#1C8A4E', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0 }}
               >
                 + {versteckteAnzahl} weitere anzeigen
               </button>
@@ -126,10 +182,7 @@ function Dashboard({ session }) {
             {alleAnzeigen && offeneSpiele.length > ANZAHL_SICHTBAR && (
               <button
                 onClick={() => setAlleAnzeigen(false)}
-                style={{
-                  marginTop: 8, background: 'none', border: 'none', color: '#5B6D66',
-                  fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0
-                }}
+                style={{ marginTop: 8, background: 'none', border: 'none', color: '#5B6D66', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0 }}
               >
                 Weniger anzeigen
               </button>
@@ -166,4 +219,4 @@ function Dashboard({ session }) {
   )
 }
 
-export default Dashboard 
+export default Dashboard
