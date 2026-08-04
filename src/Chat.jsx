@@ -16,11 +16,11 @@ const primaryButtonStyle = {
   color: 'white', 
   border: 'none', 
   borderRadius: 10, 
-  padding: '10px 16px', 
-  fontSize: 14, 
+  padding: '8px 14px', 
+  fontSize: 16, 
   fontWeight: 600, 
   cursor: 'pointer',
-  minHeight: 44,
+  minHeight: 40,
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center'
@@ -55,7 +55,7 @@ function Chat({ session }) {
         let zugriffErlaubt = false
         let chatTitel = 'Chat'
 
-        // 1. Admin-Status prüfen (Admins haben immer Zugriff)
+        // 1. Admin-Status prüfen
         const { data: adminData } = await supabase
           .from('benutzer')
           .select('ist_administrator')
@@ -66,7 +66,6 @@ function Chat({ session }) {
         if (istAdmin) zugriffErlaubt = true
 
         if (istTeamChat) {
-          // Team-Namen laden
           const { data: mData } = await supabase
             .from('mannschaften')
             .select('name')
@@ -75,7 +74,6 @@ function Chat({ session }) {
 
           if (mData) chatTitel = `Teamchat: ${mData.name}`
 
-          // Prüfen ob Benutzer Mitglied in der Mannschaft ist
           if (!zugriffErlaubt) {
             const { data: zuordnung } = await supabase
               .from('mannschaftszuordnungen')
@@ -88,7 +86,6 @@ function Chat({ session }) {
           }
 
         } else if (istSpielChat) {
-          // Spiel-Details laden
           const { data: spielData } = await supabase
             .from('spiele')
             .select('*, mannschaften(name)')
@@ -102,7 +99,6 @@ function Chat({ session }) {
               ? `${teamName} vs. ${gegner}` 
               : `${gegner} vs. ${teamName}`
 
-            // Prüfen ob Spielführer/Stellvertreter dieser Mannschaft
             if (!zugriffErlaubt && spielData.mannschaft_id) {
               const { data: zuord } = await supabase
                 .from('mannschaftszuordnungen')
@@ -117,7 +113,6 @@ function Chat({ session }) {
             }
           }
 
-          // Prüfen ob Aufstellung veröffentlicht ist und Benutzer darin ist
           if (!zugriffErlaubt) {
             const { data: aufstellungCheck } = await supabase
               .from('aufstellungen')
@@ -136,7 +131,6 @@ function Chat({ session }) {
         setTitel(chatTitel)
         setHatZugriff(zugriffErlaubt)
 
-        // Nachrichten laden
         const spaltenFilter = istTeamChat ? { mannschaft_id: echteId } : { spiel_id: echteId }
         const { data: msgData } = await supabase
           .from('nachrichten')
@@ -263,18 +257,24 @@ function Chat({ session }) {
         )}
       </div>
 
-      {/* Eingabefeld (nur bei Zugriff) */}
+      {/* Eingabefeld mit Anhängen & Senden-Button */}
       {hatZugriff && (
-        <form onSubmit={nachrichtSenden} style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#ffffff', borderTop: '1px solid #DCE7E2', padding: '10px 16px', display: 'flex', gap: 8, maxWidth: 480, margin: '0 auto', zIndex: 100 }}>
+        <form onSubmit={nachrichtSenden} style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#ffffff', borderTop: '1px solid #DCE7E2', padding: '10px 16px', display: 'flex', gap: 8, alignItems: 'center', maxWidth: 480, margin: '0 auto', zIndex: 100 }}>
           <input
             type="text"
-            placeholder="Nachricht schreiben..."
+            placeholder="Nachricht..."
             value={neueNachricht}
             onChange={e => setNeueNachricht(e.target.value)}
             style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #DCE7E2', fontSize: 14, outline: 'none', fontFamily: 'inherit' }}
           />
-          <button type="submit" disabled={speichert || !neueNachricht.trim()} style={{ ...primaryButtonStyle, width: 'auto', padding: '0 16px', opacity: !neueNachricht.trim() ? 0.5 : 1 }}>
-            Senden
+          <button type="button" title="Foto anhängen" style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: '4px' }}>
+            📷
+          </button>
+          <button type="button" title="Standort anhängen" style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: '4px' }}>
+            📍
+          </button>
+          <button type="submit" disabled={speichert || !neueNachricht.trim()} style={{ ...primaryButtonStyle, width: 'auto', padding: '0 14px', opacity: !neueNachricht.trim() ? 0.5 : 1 }}>
+            ➤
           </button>
         </form>
       )}
@@ -283,4 +283,5 @@ function Chat({ session }) {
   )
 }
 
-export default Chat 
+export default Chat
+ 
