@@ -9,6 +9,7 @@ function Admin({ session }) {
   const [benutzerListe, setBenutzerListe] = useState([])
   const [mannschaftenListe, setMannschaftenListe] = useState([])
   const [zuordnungen, setZuordnungen] = useState([])
+  const [istAdmin, setIstAdmin] = useState(false)
   const [ladend, setLadend] = useState(true)
   const [meldung, setMeldung] = useState(null)
 
@@ -28,12 +29,26 @@ function Admin({ session }) {
         .eq('id', session.user.id)
         .maybeSingle()
 
-      if (!prof?.ist_administrator) {
+      const adminFlag = prof?.ist_administrator || false
+      setIstAdmin(adminFlag)
+
+      // 2. Zuordnungen des aktuellen Nutzers prüfen (für Spielführer-Rolle)
+      const { data: meineZuordnungen } = await supabase
+        .from('mannschaftszuordnungen')
+        .select('mannschaft_id, rolle')
+        .eq('benutzer_id', session.user.id)
+
+      const gefuehrteTeamIds = meineZuordnungen
+        ?.filter(z => z.rolle === 'spielfuehrer')
+        .map(z => z.mannschaft_id) || []
+
+      // Zugang verweigern, wenn weder Admin noch Spielführer
+      if (!adminFlag && gefuehrteTeamIds.length === 0) {
         navigate('/')
         return
       }
 
-      // 2. Benutzer laden
+      // 3. Alle Benutzer laden (für Auswahlliste)
       const { data: bData } = await supabase
         .from('benutzer')
         .select('id, vorname, nachname, email')
@@ -42,16 +57,16 @@ function Admin({ session }) {
       setBenutzerListe(bData || [])
       if (bData && bData.length > 0) setSelectedBenutzer(bData[0].id)
 
-      // 3. Mannschaften laden
-      const { data: mData } = await supabase
-        .from('mannschaften')
-        .select('id, name')
-        .order('name')
-
+      // 4. Mannschaften laden (Admin = Alle, Spielführer = Nur eigene)
+      let mQuery = supabase.from('mannschaften').select('id, name').order('name')
+      if (!adminFlag) {
+        mQuery = mQuery.in('id', gefuehrteTeamIds)
+      }
+      const { data: mData } = await mQuery
       setMannschaftenListe(mData || [])
       if (mData && mData.length > 0) setSelectedMannschaft(mData[0].id)
 
-      // 4. Zuordnungen laden
+      // 5. Zuordnungen laden
       const { data: zData } = await supabase
         .from('mannschaftszuordnungen')
         .select('id, benutzer_id, mannschaft_id, rolle, benutzer(id, vorname, nachname, email), mannschaften(id, name)')
@@ -128,7 +143,7 @@ function Admin({ session }) {
 
       <div style={{ padding: '20px 20px 100px', maxWidth: 480, margin: '0 auto' }}>
         <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 20, margin: '8px 0 16px' }}>
-          ⚙️ Adminbereich
+          ⚙️ {istAdmin ? 'Adminbereich' : 'Teamverwaltung'}
         </h1>
 
         {meldung && (
@@ -146,10 +161,10 @@ function Admin({ session }) {
           <div style={{ textAlign: 'center', padding: 40, color: '#5B6D66' }}>Laden...</div>
         ) : (
           <>
-            {/* 1. MANNSCHAFT & ROLLE ZUWEISEN */}
+            {/* MANNSCHAFT & ROLLE ZUWEISEN */}
             <div style={{ background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 16, marginBottom: 24 }}>
               <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, margin: '0 0 12px', color: '#1C8A4E' }}>
-                ➕ Mannschaft & Rolle zuweisen
+                ➕ Spieler zur Mannschaft hinzufügen
               </h3>
               
               <form onSubmit={zuweisungSpeichern} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -180,7 +195,7 @@ function Admin({ session }) {
                 </div>
 
                 <div>
-                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#5B6D66' }}>Rolle in der Mannschaft</label>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#5B6D66' }}>Rolle</label>
                   <select 
                     value={selectedRolle} 
                     onChange={e => setSelectedRolle(e.target.value)}
@@ -201,9 +216,9 @@ function Admin({ session }) {
               </form>
             </div>
 
-            {/* 2. MANNSCHAFTSROLLEN (NACH TEAMS GEGRUPPIERT) */}
+            {/* MANNSCHAFTSKADER */}
             <h2 style={{ fontFamily: 'Sora, sans-serif', fontSize: 16, margin: '0 0 12px' }}>
-              👥 Mannschaftskader & Rollen
+              👥 Kaderverwalter
             </h2>
 
             {mannschaftenListe.map(m => {
@@ -262,3 +277,4 @@ function Admin({ session }) {
 }
 
 export default Admin
+ 
