@@ -18,6 +18,7 @@ function Chat({ session }) {
   const [fehler, setFehler] = useState(null)
   const [keinZugriff, setKeinZugriff] = useState(false)
   const [zeigeEmojis, setZeigeEmojis] = useState(false)
+  const [zeigeAnhangMenu, setZeigeAnhangMenu] = useState(false)
   const [medienHochladend, setMedienHochladend] = useState(false)
   const listeEndeRef = useRef(null)
 
@@ -121,6 +122,7 @@ function Chat({ session }) {
   const fotoSenden = async (e) => {
     const datei = e.target.files[0]
     if (!datei || !chatId) return
+    setZeigeAnhangMenu(false)
     setMedienHochladend(true)
     const dateiPfad = `${chatId}/${Date.now()}_${datei.name}`
     const { error: uploadError } = await supabase.storage.from('chat-medien').upload(dateiPfad, datei)
@@ -133,6 +135,7 @@ function Chat({ session }) {
 
   const standortSenden = () => {
     if (!chatId || !navigator.geolocation) return
+    setZeigeAnhangMenu(false)
     navigator.geolocation.getCurrentPosition(async (pos) => {
       await supabase.from('nachrichten').insert({
         chat_id: chatId, benutzer_id: session.user.id, text: '📍 Standort',
@@ -226,30 +229,74 @@ function Chat({ session }) {
         </div>
       )}
 
+      {zeigeAnhangMenu && (
+        <div style={{
+          position: 'fixed', bottom: 128, left: 0, right: 0, maxWidth: 480, margin: '0 auto',
+          background: '#ffffff', borderTop: '1px solid #DCE7E2', padding: '14px 20px', display: 'flex',
+          gap: 28, zIndex: 1000, boxSizing: 'border-box'
+        }}>
+          <label style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, cursor: 'pointer' }}>
+            <div style={{
+              width: 46, height: 46, borderRadius: '50%', background: '#7C5CE0', color: 'white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20
+            }}>
+              📷
+            </div>
+            <span style={{ fontSize: 11.5, color: '#5B6D66' }}>Foto</span>
+            <input type="file" accept="image/*" onChange={fotoSenden} style={{ display: 'none' }} disabled={medienHochladend} />
+          </label>
+
+          <button
+            type="button"
+            onClick={standortSenden}
+            style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+          >
+            <div style={{
+              width: 46, height: 46, borderRadius: '50%', background: '#1C8A4E', color: 'white',
+              display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20
+            }}>
+              📍
+            </div>
+            <span style={{ fontSize: 11.5, color: '#5B6D66' }}>Standort</span>
+          </button>
+        </div>
+      )}
+
       <form
         onSubmit={senden}
         style={{
-          position: 'fixed', bottom: 64, left: 0, right: 0, height: 64, background: '#f0f2f5',
+          position: 'fixed', bottom: 64, left: 0, right: 0, minHeight: 64, background: '#f0f2f5',
           borderTop: '1px solid #DCE7E2', padding: '8px 12px', display: 'flex', gap: 8, alignItems: 'center',
           maxWidth: 480, margin: '0 auto', zIndex: 1000, boxSizing: 'border-box'
         }}
       >
-        <button type="button" onClick={() => setZeigeEmojis(z => !z)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', flexShrink: 0 }}>😀</button>
+        <div style={{
+          flex: 1, display: 'flex', alignItems: 'center', gap: 6, background: '#ffffff',
+          borderRadius: 24, padding: '4px 6px 4px 12px', boxShadow: '0 1px 0.5px rgba(11,20,26,.13)'
+        }}>
+          <button
+            type="button"
+            onClick={() => { setZeigeEmojis(z => !z); setZeigeAnhangMenu(false) }}
+            style={{ background: 'none', border: 'none', fontSize: 19, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: 2 }}
+          >
+            😀
+          </button>
+          <input
+            type="text"
+            placeholder="Nachricht..."
+            value={text}
+            onChange={e => setText(e.target.value)}
+            style={{ flex: 1, padding: '8px 2px', border: 'none', fontSize: 14, outline: 'none', fontFamily: 'inherit', background: 'transparent', minWidth: 0 }}
+          />
+          <button
+            type="button"
+            onClick={() => { setZeigeAnhangMenu(m => !m); setZeigeEmojis(false) }}
+            style={{ background: 'none', border: 'none', fontSize: 19, cursor: 'pointer', flexShrink: 0, lineHeight: 1, padding: 2, transform: 'rotate(45deg)', color: '#5B6D66' }}
+          >
+            📎
+          </button>
+        </div>
 
-        <label style={{ cursor: 'pointer', flexShrink: 0, fontSize: 20 }}>
-          📷
-          <input type="file" accept="image/*" onChange={fotoSenden} style={{ display: 'none' }} disabled={medienHochladend} />
-        </label>
-
-        <button type="button" onClick={standortSenden} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', flexShrink: 0 }}>📍</button>
-
-        <input
-          type="text"
-          placeholder="Nachricht..."
-          value={text}
-          onChange={e => setText(e.target.value)}
-          style={{ flex: 1, padding: '10px 14px', borderRadius: 24, border: 'none', fontSize: 14, outline: 'none', fontFamily: 'inherit', background: '#ffffff', boxShadow: '0 1px 0.5px rgba(11,20,26,.13)' }}
-        />
         <button
           type="submit"
           disabled={!text.trim()}
@@ -264,4 +311,4 @@ function Chat({ session }) {
   )
 }
 
-export default Chat 
+export default Chat
