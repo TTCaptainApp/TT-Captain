@@ -34,10 +34,45 @@ function Chat({ session }) {
 
   const initialisieren = async () => {
     setLadend(true)
+    setFehler(null)
 
     const { data: benutzerRow } = await supabase.from('benutzer').select('ist_administrator').eq('id', session.user.id).single()
-    setIstAdmin(benutzerRow?.ist_administrator || false)
+    const admin = benutzerRow?.ist_administrator || false
+    setIstAdmin(admin)
 
+    // 1. Berechtigungsprüfung vorab (für Nicht-Admins)
+    if (!admin) {
+      if (typ === 'mannschaft') {
+        const { data: z } = await supabase
+          .from('mannschaftszuordnungen')
+          .select('id')
+          .eq('benutzer_id', session.user.id)
+          .eq('mannschaft_id', mannschaftId)
+          .maybeSingle()
+
+        if (!z) {
+          setFehler('Du hast keinen Zugriff auf diesen Mannschaftschat.')
+          setLadend(false)
+          return
+        }
+      } else {
+        const { data: a } = await supabase
+          .from('aufstellung_spieler')
+          .select('id, aufstellungen!inner(veroeffentlicht, spiel_id)')
+          .eq('benutzer_id', session.user.id)
+          .eq('aufstellungen.spiel_id', spielId)
+          .eq('aufstellungen.veroeffentlicht', true)
+          .maybeSingle()
+
+        if (!a) {
+          setFehler('Du hast keinen Zugriff auf diesen Spielchat oder die Aufstellung ist noch nicht veröffentlicht.')
+          setLadend(false)
+          return
+        }
+      }
+    }
+
+    // 2. Chat laden oder erstellen
     let bestehenderChat = null
     if (typ === 'mannschaft') {
       const { data: m } = await supabase.from('mannschaften').select('name').eq('id', mannschaftId).single()
@@ -60,7 +95,6 @@ function Chat({ session }) {
         : { typ: 'spiel', spiel_id: spielId }
       const { data, error } = await supabase.from('chats').insert(insertPayload).select().single()
       if (error) {
-        // evtl. wurde der Chat gerade parallel von jemand anderem angelegt - nochmal versuchen zu laden
         const { data: nochmal } = typ === 'mannschaft'
           ? await supabase.from('chats').select('id').eq('typ', 'mannschaft').eq('mannschaft_id', mannschaftId).maybeSingle()
           : await supabase.from('chats').select('id').eq('typ', 'spiel').eq('spiel_id', spielId).maybeSingle()
@@ -78,7 +112,6 @@ function Chat({ session }) {
 
   useEffect(() => { initialisieren() }, [mannschaftId, spielId, session])
 
-  // leichtes Polling, damit neue Nachrichten von anderen auch ohne Neuladen ankommen
   useEffect(() => {
     if (!chatId) return
     const intervall = setInterval(() => nachrichtenLaden(chatId), 5000)
@@ -109,44 +142,50 @@ function Chat({ session }) {
 
       <div style={{ padding: '14px 20px', maxWidth: 480, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
         <Link to="/chats" style={{ fontSize: 13, color: '#1C8A4E', fontWeight: 600, textDecoration: 'none' }}>← Zurück zu Chats</Link>
-        <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 18, margin: '10px 0 14px' }}>💬 {titel}</h1>
+        <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 18, margin: '10px 0 14px' }}>💬 {titel || 'Chat'}</h1>
 
-        {fehler && <p style={{ color: '#c0392b', fontSize: 13 }}>{fehler}</p>}
-
-        <div style={{ flex: 1, overflowY: 'auto', marginBottom: 90 }}>
-          {nachrichten.length === 0 && <p style={{ fontSize: 13, color: '#5B6D66' }}>Noch keine Nachrichten.</p>}
-          {nachrichten.map(n => {
-            const eigene = n.benutzer_id === session.user.id
-            return (
-              <div key={n.id} style={{ display: 'flex', justifyContent: eigene ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
-                <div style={{
-                  maxWidth: '75%', background: eigene ? '#1C8A4E' : '#ffffff', color: eigene ? 'white' : '#16261F',
-                  border: eigene ? 'none' : '1px solid #DCE7E2', borderRadius: 12, padding: '8px 12px'
-                }}>
-                  {!eigene && <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 2, color: '#1C8A4E' }}>{n.name}</div>}
-                  <div style={{ fontSize: 14 }}>{n.text}</div>
-                  <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>
-                    {new Date(n.gesendet_am).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+        {fehler ? (
+          <div style={{ padding: 14, background: '#FDF2F2', border: '1px solid #F87171', borderRadius: 10, color: '#991B1B', marginTop: 10, fontSize: 13, fontWeight: 500 }}>
+            ⛔ {fehler}
+          </div>
+        ) : (
+          <>
+            <div style={{ flex: 1, overflowY: 'auto', marginBottom: 90 }}>
+              {nachrichten.length === 0 && <p style={{ fontSize: 13, color: '#5B6D66' }}>Noch keine Nachrichten.</p>}
+              {nachrichten.map(n => {
+                const eigene = n.benutzer_id === session.user.id
+                return (
+                  <div key={n.id} style={{ display: 'flex', justifyContent: eigene ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
+                    <div style={{
+                      maxWidth: '75%', background: eigene ? '#1C8A4E' : '#ffffff', color: eigene ? 'white' : '#16261F',
+                      border: eigene ? 'none' : '1px solid #DCE7E2', borderRadius: 12, padding: '8px 12px'
+                    }}>
+                      {!eigene && <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 2, color: '#1C8A4E' }}>{n.name}</div>}
+                      <div style={{ fontSize: 14 }}>{n.text}</div>
+                      <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>
+                        {new Date(n.gesendet_am).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            )
-          })}
-          <div ref={listeEndeRef} />
-        </div>
-      </div>
+                )
+              })}
+              <div ref={listeEndeRef} />
+            </div>
 
-      <form
-        onSubmit={senden}
-        style={{
-          position: 'fixed', bottom: 60, left: 0, right: 0, background: '#ffffff',
-          borderTop: '1px solid #DCE7E2', padding: '10px 20px', display: 'flex', gap: 8,
-          maxWidth: 480, margin: '0 auto'
-        }}
-      >
-        <input style={inputStyle} placeholder="Nachricht..." value={text} onChange={e => setText(e.target.value)} />
-        <button type="submit" style={buttonStyle}>Senden</button>
-      </form>
+            <form
+              onSubmit={senden}
+              style={{
+                position: 'fixed', bottom: 60, left: 0, right: 0, background: '#ffffff',
+                borderTop: '1px solid #DCE7E2', padding: '10px 20px', display: 'flex', gap: 8,
+                maxWidth: 480, margin: '0 auto'
+              }}
+            >
+              <input style={inputStyle} placeholder="Nachricht..." value={text} onChange={e => setText(e.target.value)} />
+              <button type="submit" style={buttonStyle}>Senden</button>
+            </form>
+          </>
+        )}
+      </div>
 
       <BottomNav istAdmin={istAdmin} />
     </div>
@@ -154,3 +193,4 @@ function Chat({ session }) {
 }
 
 export default Chat
+ 
