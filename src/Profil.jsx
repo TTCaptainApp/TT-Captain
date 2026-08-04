@@ -16,6 +16,11 @@ function Profil({ session }) {
   const [notifChat, setNotifChat] = useState(true)
   const [notifEmail, setNotifEmail] = useState(true)
 
+  // Profilbearbeitung
+  const [bearbeitenModus, setBearbeitenModus] = useState(false)
+  const [telefonnummer, setTelefonnummer] = useState('')
+  const [profilbildHochladend, setProfilbildHochladend] = useState(false)
+
   useEffect(() => {
     async function profilLaden() {
       try {
@@ -29,6 +34,10 @@ function Profil({ session }) {
           .maybeSingle()
 
         setProfil(bData)
+        setTelefonnummer(bData?.telefonnummer || '')
+        setNotifAufstellung(bData?.benachrichtigung_aufstellung ?? true)
+        setNotifChat(bData?.benachrichtigung_chat ?? true)
+        setNotifEmail(bData?.benachrichtigung_email ?? true)
 
         // 2. Mannschaften & Rollen des Benutzers abfragen
         const { data: mData } = await supabase
@@ -55,6 +64,30 @@ function Profil({ session }) {
   const abmelden = async () => {
     await supabase.auth.signOut()
     navigate('/login')
+  }
+
+  const notifAendern = async (feld, wert, setter) => {
+    setter(wert)
+    await supabase.from('benutzer').update({ [feld]: wert }).eq('id', session.user.id)
+  }
+
+  const telefonSpeichern = async () => {
+    await supabase.from('benutzer').update({ telefonnummer }).eq('id', session.user.id)
+    setProfil(prev => ({ ...prev, telefonnummer }))
+    setBearbeitenModus(false)
+  }
+
+  const profilbildHochladen = async (e) => {
+    const datei = e.target.files[0]
+    if (!datei) return
+    setProfilbildHochladend(true)
+    const dateiPfad = `${session.user.id}/${Date.now()}_${datei.name}`
+    const { error: uploadError } = await supabase.storage.from('profilbilder').upload(dateiPfad, datei)
+    if (uploadError) { setProfilbildHochladend(false); return }
+    const { data: urlData } = supabase.storage.from('profilbilder').getPublicUrl(dateiPfad)
+    await supabase.from('benutzer').update({ profilbild_url: urlData.publicUrl }).eq('id', session.user.id)
+    setProfil(prev => ({ ...prev, profilbild_url: urlData.publicUrl }))
+    setProfilbildHochladend(false)
   }
 
   const getRolleLabel = (rolle) => {
@@ -91,19 +124,43 @@ function Profil({ session }) {
 
         {/* PROFIL KOPF */}
         <div style={{ background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 16, marginBottom: 16, display: 'flex', alignItems: 'center', gap: 14 }}>
-          <div style={{
-            width: 52, height: 52, borderRadius: '50%', background: '#1C8A4E', color: 'white',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18
-          }}>
-            {getInitials()}
-          </div>
-          <div>
+          <label style={{ cursor: 'pointer' }}>
+            {profil?.profilbild_url ? (
+              <img src={profil.profilbild_url} alt="Profilbild" style={{ width: 52, height: 52, borderRadius: '50%', objectFit: 'cover' }} />
+            ) : (
+              <div style={{
+                width: 52, height: 52, borderRadius: '50%', background: '#1C8A4E', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18
+              }}>
+                {getInitials()}
+              </div>
+            )}
+            <input type="file" accept="image/*" onChange={profilbildHochladen} style={{ display: 'none' }} disabled={profilbildHochladend} />
+          </label>
+          <div style={{ flex: 1 }}>
             <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
               {profil?.vorname} {profil?.nachname}
             </h2>
             <p style={{ margin: '2px 0 4px', fontSize: 13, color: '#5B6D66' }}>
               {session?.user?.email}
             </p>
+            {bearbeitenModus ? (
+              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
+                <input
+                  type="tel"
+                  value={telefonnummer}
+                  onChange={e => setTelefonnummer(e.target.value)}
+                  placeholder="Telefonnummer"
+                  style={{ flex: 1, padding: '6px 8px', borderRadius: 6, border: '1px solid #DCE7E2', fontSize: 13 }}
+                />
+                <button onClick={telefonSpeichern} style={{ background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}>OK</button>
+              </div>
+            ) : (
+              <p style={{ margin: '0 0 4px', fontSize: 13, color: '#5B6D66' }}>
+                📞 {profil?.telefonnummer || 'Keine Telefonnummer hinterlegt'}{' '}
+                <button onClick={() => setBearbeitenModus(true)} style={{ background: 'none', border: 'none', color: '#1C8A4E', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>✏️</button>
+              </p>
+            )}
             {profil?.ist_administrator && (
               <span style={{ fontSize: 11, background: '#E8F5E9', color: '#1C8A4E', padding: '2px 8px', borderRadius: 12, fontWeight: 600 }}>
                 👑 Administrator
@@ -144,7 +201,7 @@ function Profil({ session }) {
                 <div style={{ fontWeight: 600, fontSize: 13 }}>Neue Aufstellungen</div>
                 <div style={{ fontSize: 11, color: '#5B6D66' }}>Benachrichtigen, wenn eine Aufstellung veröffentlicht wird</div>
               </div>
-              <input type="checkbox" checked={notifAufstellung} onChange={e => setNotifAufstellung(e.target.checked)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
+              <input type="checkbox" checked={notifAufstellung} onChange={e => notifAendern('benachrichtigung_aufstellung', e.target.checked, setNotifAufstellung)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
             </label>
 
             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
@@ -152,7 +209,7 @@ function Profil({ session }) {
                 <div style={{ fontWeight: 600, fontSize: 13 }}>Chat-Nachrichten</div>
                 <div style={{ fontSize: 11, color: '#5B6D66' }}>Benachrichtigen bei neuen Nachrichten im Team-/Spielchat</div>
               </div>
-              <input type="checkbox" checked={notifChat} onChange={e => setNotifChat(e.target.checked)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
+              <input type="checkbox" checked={notifChat} onChange={e => notifAendern('benachrichtigung_chat', e.target.checked, setNotifChat)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
             </label>
 
             <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
@@ -160,7 +217,7 @@ function Profil({ session }) {
                 <div style={{ fontWeight: 600, fontSize: 13 }}>E-Mail Zusammenfassung</div>
                 <div style={{ fontSize: 11, color: '#5B6D66' }}>Wichtige Termine und Änderungen per E-Mail erhalten</div>
               </div>
-              <input type="checkbox" checked={notifEmail} onChange={e => setNotifEmail(e.target.checked)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
+              <input type="checkbox" checked={notifEmail} onChange={e => notifAendern('benachrichtigung_email', e.target.checked, setNotifEmail)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
             </label>
           </div>
         </div>
@@ -197,4 +254,3 @@ function Profil({ session }) {
 }
 
 export default Profil
- 
