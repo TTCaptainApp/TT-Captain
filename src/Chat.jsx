@@ -8,7 +8,22 @@ const cardStyle = {
   border: '1px solid #DCE7E2', 
   borderRadius: 14, 
   padding: 12, 
-  marginBottom: 8 
+  marginBottom: 8,
+  boxSizing: 'border-box'
+}
+
+const actionButtonStyle = {
+  background: '#ffffff',
+  border: '1px solid #DCE7E2',
+  borderRadius: 10,
+  width: 40,
+  height: 40,
+  fontSize: 18,
+  cursor: 'pointer',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  flexShrink: 0
 }
 
 const primaryButtonStyle = { 
@@ -16,14 +31,15 @@ const primaryButtonStyle = {
   color: 'white', 
   border: 'none', 
   borderRadius: 10, 
-  padding: '8px 14px', 
+  width: 40,
+  height: 40,
   fontSize: 16, 
   fontWeight: 600, 
   cursor: 'pointer',
-  minHeight: 40,
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'center'
+  justifyContent: 'center',
+  flexShrink: 0
 }
 
 function Chat({ session }) {
@@ -55,7 +71,6 @@ function Chat({ session }) {
         let zugriffErlaubt = false
         let chatTitel = 'Chat'
 
-        // Admin-Status prüfen
         const { data: adminData } = await supabase
           .from('benutzer')
           .select('ist_administrator')
@@ -131,7 +146,6 @@ function Chat({ session }) {
         setTitel(chatTitel)
         setHatZugriff(zugriffErlaubt)
 
-        // Nachrichten über chat_id laden und nach gesendet_am sortieren
         const { data: msgData } = await supabase
           .from('nachrichten')
           .select('*, benutzer:benutzer_id(vorname, nachname)')
@@ -192,31 +206,31 @@ function Chat({ session }) {
 
   if (ladend) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F6FAF8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif' }}>
+      <div style={{ minHeight: '100vh', background: '#F6FAF8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
         Lade Chat...
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', overflowX: 'hidden', position: 'relative' }}>
       
       {/* Header */}
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid #DCE7E2', background: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 10 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <button onClick={() => navigate('/chats')} style={{ background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', fontWeight: 700 }}>
+      <div style={{ position: 'sticky', top: 0, left: 0, right: 0, zIndex: 100, padding: '14px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <button onClick={() => navigate('/chats')} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', fontWeight: 700, color: '#1C8A4E', padding: 4 }}>
             ←
           </button>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#1C8A4E', textTransform: 'uppercase' }}>Chat</div>
-            <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700 }}>{titel}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: '#1C8A4E', textTransform: 'uppercase', letterSpacing: '.04em' }}>Chat</div>
+            <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700, color: '#16261F' }}>{titel}</div>
           </div>
         </div>
         <Brand size={14} />
       </div>
 
       {/* Inhalt */}
-      <div style={{ flex: 1, padding: '16px', maxWidth: 480, width: '100%', margin: '0 auto', paddingBottom: 90 }}>
+      <div style={{ flex: 1, width: '100%', maxWidth: 480, margin: '0 auto', padding: '16px 20px 100px', boxSizing: 'border-box' }}>
         {!hatZugriff ? (
           <div style={{ ...cardStyle, background: '#FDF2F2', border: '1px solid #F5C6CB', color: '#C0392B', textAlign: 'center', padding: 20 }}>
             🚫 Du hast keinen Zugriff auf diesen Chat oder die Aufstellung ist noch nicht veröffentlicht.
@@ -231,7 +245,7 @@ function Chat({ session }) {
               nachrichten.map(msg => {
                 const istEigen = msg.benutzer_id === session.user.id
                 return (
-                  <div key={msg.id || Math.random()} style={{ marginBottom: 10, display: 'flex', flexDirection: 'column', alignItems: istEigen ? 'flex-end' : 'flex-start' }}>
+                  <div key={msg.id || Math.random()} style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', alignItems: istEigen ? 'flex-end' : 'flex-start' }}>
                     <div style={{ fontSize: 11, color: '#5B6D66', marginBottom: 2, padding: '0 4px' }}>
                       {istEigen ? 'Du' : `${msg.benutzer?.vorname || 'Mitglied'} ${msg.benutzer?.nachname || ''}`}
                     </div>
@@ -244,7 +258,8 @@ function Chat({ session }) {
                       maxWidth: '85%',
                       fontSize: 14,
                       wordBreak: 'break-word',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
+                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
+                      boxSizing: 'border-box'
                     }}>
                       {msg.text}
                     </div>
@@ -257,23 +272,23 @@ function Chat({ session }) {
         )}
       </div>
 
-      {/* Eingabefeld mit Anhängen & Senden-Button */}
+      {/* Eingabefeld unten */}
       {hatZugriff && (
-        <form onSubmit={nachrichtSenden} style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#ffffff', borderTop: '1px solid #DCE7E2', padding: '10px 16px', display: 'flex', gap: 8, alignItems: 'center', maxWidth: 480, margin: '0 auto', zIndex: 100 }}>
+        <form onSubmit={nachrichtSenden} style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#ffffff', borderTop: '1px solid #DCE7E2', padding: '10px 16px', display: 'flex', gap: 8, alignItems: 'center', maxWidth: 480, margin: '0 auto', zIndex: 100, boxSizing: 'border-box' }}>
           <input
             type="text"
-            placeholder="Nachricht..."
+            placeholder="Nachricht schreiben..."
             value={neueNachricht}
             onChange={e => setNeueNachricht(e.target.value)}
-            style={{ flex: 1, padding: '10px 12px', borderRadius: 8, border: '1px solid #DCE7E2', fontSize: 14, outline: 'none', fontFamily: 'inherit' }}
+            style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid #DCE7E2', fontSize: 14, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', background: '#F6FAF8', color: '#16261F' }}
           />
-          <button type="button" title="Foto anhängen" style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: '4px' }}>
+          <button type="button" title="Foto anhängen" style={actionButtonStyle}>
             📷
           </button>
-          <button type="button" title="Standort anhängen" style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', padding: '4px' }}>
+          <button type="button" title="Standort anhängen" style={actionButtonStyle}>
             📍
           </button>
-          <button type="submit" disabled={speichert || !neueNachricht.trim()} style={{ ...primaryButtonStyle, width: 'auto', padding: '0 14px', opacity: !neueNachricht.trim() ? 0.5 : 1 }}>
+          <button type="submit" disabled={speichert || !neueNachricht.trim()} style={{ ...primaryButtonStyle, opacity: !neueNachricht.trim() ? 0.5 : 1 }}>
             ➤
           </button>
         </form>
