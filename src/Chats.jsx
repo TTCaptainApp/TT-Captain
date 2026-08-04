@@ -86,7 +86,7 @@ function Chats({ session }) {
           Teamchats
         </div>
         {teamChats.map(t => (
-          <Link key={t.mannschaft_id} to={`/chats/mannschaft/${t.mannschaft_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Link key={t.mannschaft_id} to={`/chat/team_${t.mannschaft_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
             <div style={cardStyle}>
               <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>💬 {t.name}</span>
             </div>
@@ -98,7 +98,7 @@ function Chats({ session }) {
           Spielchats
         </div>
         {spielChats.map(s => (
-          <Link key={s.id} to={`/chats/spiel/${s.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Link key={s.id} to={`/chat/spiel_${s.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
             <div style={cardStyle}>
               <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>
                 💬 {s.heim_oder_auswaerts === 'heim' ? `${s.mannschaften?.name} vs. ${s.gegner}` : `${s.gegner} vs. ${s.mannschaften?.name}`}
@@ -116,3 +116,4 @@ function Chats({ session }) {
 }
 
 export default Chats
+ 
