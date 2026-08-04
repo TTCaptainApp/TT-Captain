@@ -1,156 +1,123 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
 import BottomNav from './BottomNav'
 
-const cardStyle = {
-  background: '#ffffff',
-  border: '1px solid #DCE7E2',
-  borderRadius: 14,
-  padding: 16,
-  marginBottom: 16
-}
-
-const inputStyle = {
-  width: '100%',
-  padding: '10px 12px',
-  fontSize: 14,
-  borderRadius: 8,
-  border: '1px solid #DCE7E2',
-  background: '#ffffff',
-  boxSizing: 'border-box',
-  fontFamily: 'inherit'
-}
-
-const buttonStyle = {
-  background: '#1C8A4E',
-  color: 'white',
-  border: 'none',
-  borderRadius: 8,
-  padding: '10px 16px',
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: 'pointer'
-}
-
 function Admin({ session }) {
-  const [istAdmin, setIstAdmin] = useState(false)
+  const navigate = useNavigate()
   const [benutzerListe, setBenutzerListe] = useState([])
-  const [mannschaften, setMannschaften] = useState([])
+  const [mannschaftenListe, setMannschaftenListe] = useState([])
   const [zuordnungen, setZuordnungen] = useState([])
-
-  // Formulardaten für neue Zuordnung
-  const [selBenutzer, setSelBenutzer] = useState('')
-  const [selMannschaft, setSelMannschaft] = useState('')
-  const [selRolle, setSelRolle] = useState('spieler')
-
   const [ladend, setLadend] = useState(true)
   const [meldung, setMeldung] = useState(null)
 
+  // Formular-States
+  const [selectedBenutzer, setSelectedBenutzer] = useState('')
+  const [selectedMannschaft, setSelectedMannschaft] = useState('')
+  const [selectedRolle, setSelectedRolle] = useState('spieler')
+
   const datenLaden = async () => {
-    setLadend(true)
+    try {
+      setLadend(true)
+      
+      // 1. Prüfen ob Admin
+      const { data: prof } = await supabase
+        .from('benutzer')
+        .select('ist_administrator')
+        .eq('id', session.user.id)
+        .maybeSingle()
 
-    // 1. Admin-Prüfung
-    const { data: bRow } = await supabase.from('benutzer').select('ist_administrator').eq('id', session.user.id).single()
-    if (!bRow?.ist_administrator) {
-      setIstAdmin(false)
+      if (!prof?.ist_administrator) {
+        navigate('/')
+        return
+      }
+
+      // 2. Benutzer laden
+      const { data: bData } = await supabase
+        .from('benutzer')
+        .select('id, vorname, nachname, email')
+        .order('vorname')
+
+      setBenutzerListe(bData || [])
+      if (bData && bData.length > 0) setSelectedBenutzer(bData[0].id)
+
+      // 3. Mannschaften laden
+      const { data: mData } = await supabase
+        .from('mannschaften')
+        .select('id, name')
+        .order('name')
+
+      setMannschaftenListe(mData || [])
+      if (mData && mData.length > 0) setSelectedMannschaft(mData[0].id)
+
+      // 4. Zuordnungen laden
+      const { data: zData } = await supabase
+        .from('mannschaftszuordnungen')
+        .select('id, benutzer_id, mannschaft_id, rolle, benutzer(id, vorname, nachname, email), mannschaften(id, name)')
+
+      setZuordnungen(zData || [])
+
+    } catch (err) {
+      console.error(err)
+    } finally {
       setLadend(false)
-      return
     }
-    setIstAdmin(true)
-
-    // 2. Alle Benutzer laden
-    const { data: bData } = await supabase.from('benutzer').select('id, vorname, nachname, email, ist_administrator').order('vorname')
-    setBenutzerListe(bData || [])
-
-    // 3. Alle Mannschaften laden
-    const { data: mData } = await supabase.from('mannschaften').select('id, name').order('name')
-    setMannschaften(mData || [])
-
-    // 4. Alle Zuordnungen laden
-    const { data: zData } = await supabase
-      .from('mannschaftszuordnungen')
-      .select('id, benutzer_id, mannschaft_id, rolle, mannschaften(name)')
-
-    setZuordnungen(zData || [])
-    setLadend(false)
   }
 
   useEffect(() => {
     datenLaden()
   }, [session])
 
-  // Admin-Status umschalten
-  const toggleAdmin = async (userId, aktuellerStatus) => {
-    const { error } = await supabase
-      .from('benutzer')
-      .update({ ist_administrator: !aktuellerStatus })
-      .eq('id', userId)
-
-    if (error) setMeldung({ typ: 'error', text: error.message })
-    else {
-      setMeldung({ typ: 'success', text: 'Admin-Status aktualisiert.' })
-      datenLaden()
-    }
-  }
-
-  // Neue Zuordnung / Rolle speichern
-  const zuordnungSpeichern = async (e) => {
+  const zuweisungSpeichern = async (e) => {
     e.preventDefault()
-    if (!selBenutzer || !selMannschaft) {
-      setMeldung({ typ: 'error', text: 'Bitte wähle Nutzer und Mannschaft aus.' })
+    setMeldung(null)
+
+    if (!selectedBenutzer || !selectedMannschaft) {
+      setMeldung({ typ: 'error', text: 'Bitte Spieler und Mannschaft auswählen.' })
       return
     }
 
     const { error } = await supabase
       .from('mannschaftszuordnungen')
-      .upsert({
-        benutzer_id: selBenutzer,
-        mannschaft_id: selMannschaft,
-        rolle: selRolle
-      }, { onConflict: 'benutzer_id, mannschaft_id' })
+      .insert({
+        benutzer_id: selectedBenutzer,
+        mannschaft_id: selectedMannschaft,
+        rolle: selectedRolle
+      })
 
     if (error) {
-      setMeldung({ typ: 'error', text: error.message })
+      setMeldung({ typ: 'error', text: 'Fehler beim Speichern: ' + error.message })
     } else {
-      setMeldung({ typ: 'success', text: 'Zuordnung erfolgreich gespeichert.' })
-      setSelBenutzer('')
-      setSelMannschaft('')
-      setSelRolle('spieler')
+      setMeldung({ typ: 'success', text: 'Rolle erfolgreich zugewiesen!' })
       datenLaden()
     }
   }
 
-  // Rolle direkt in Tabelle ändern
-  const rolleAendern = async (zuordnungId, neueRolle) => {
+  const rolleAendern = async (id, neueRolle) => {
     const { error } = await supabase
       .from('mannschaftszuordnungen')
       .update({ rolle: neueRolle })
-      .eq('id', zuordnungId)
+      .eq('id', id)
 
-    if (error) setMeldung({ typ: 'error', text: error.message })
-    else datenLaden()
+    if (error) {
+      setMeldung({ typ: 'error', text: error.message })
+    } else {
+      datenLaden()
+    }
   }
 
-  // Zuordnung löschen
-  const zuordnungEntfernen = async (zuordnungId) => {
-    if (!window.confirm('Zuordnung wirklich löschen?')) return
-    const { error } = await supabase.from('mannschaftszuordnungen').delete().eq('id', zuordnungId)
-    if (error) setMeldung({ typ: 'error', text: error.message })
-    else datenLaden()
-  }
+  const zuordnungEntfernen = async (id) => {
+    const { error } = await supabase
+      .from('mannschaftszuordnungen')
+      .delete()
+      .eq('id', id)
 
-  if (ladend) return null
-
-  if (!istAdmin) {
-    return (
-      <div style={{ minHeight: '100vh', background: '#F6FAF8', padding: 20, fontFamily: 'Inter, sans-serif' }}>
-        <h2 style={{ color: '#991B1B' }}>⛔ Zugriff verweigert</h2>
-        <p>Du benötigst Administrator-Rechte, um diese Seite aufzurufen.</p>
-        <Link to="/" style={{ color: '#1C8A4E', fontWeight: 600 }}>Zurück zur Startseite</Link>
-      </div>
-    )
+    if (error) {
+      setMeldung({ typ: 'error', text: error.message })
+    } else {
+      datenLaden()
+    }
   }
 
   return (
@@ -160,7 +127,9 @@ function Admin({ session }) {
       </div>
 
       <div style={{ padding: '20px 20px 100px', maxWidth: 480, margin: '0 auto' }}>
-        <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 20, margin: '8px 0 16px' }}>⚙️ Adminbereich</h1>
+        <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 20, margin: '8px 0 16px' }}>
+          ⚙️ Adminbereich
+        </h1>
 
         {meldung && (
           <div style={{
@@ -173,117 +142,123 @@ function Admin({ session }) {
           </div>
         )}
 
-        {/* 1. SPIELER EINER MANNSCHAFT ZUWEISEN & ROLLE FESTLEGEN */}
-        <div style={cardStyle}>
-          <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, margin: '0 0 12px', color: '#1C8A4E' }}>
-            ➕ Mannschaft & Rolle zuweisen
-          </h3>
-          <form onSubmit={zuordnungSpeichern} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: '#5B6D66', display: 'block', marginBottom: 4 }}>Spieler</label>
-              <select style={inputStyle} value={selBenutzer} onChange={e => setSelBenutzer(e.target.value)}>
-                <option value="">-- Spieler auswählen --</option>
-                {benutzerListe.map(b => (
-                  <option key={b.id} value={b.id}>{b.vorname} {b.nachname} ({b.email})</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: '#5B6D66', display: 'block', marginBottom: 4 }}>Mannschaft</label>
-              <select style={inputStyle} value={selMannschaft} onChange={e => setSelMannschaft(e.target.value)}>
-                <option value="">-- Mannschaft auswählen --</option>
-                {mannschaften.map(m => (
-                  <option key={m.id} value={m.id}>{m.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={{ fontSize: 12, fontWeight: 700, color: '#5B6D66', display: 'block', marginBottom: 4 }}>Rolle in der Mannschaft</label>
-              <select style={inputStyle} value={selRolle} onChange={e => setSelRolle(e.target.value)}>
-                <option value="spieler">🏓 Spieler</option>
-                <option value="stellvertreter">🎗️ Stellv. Spielführer</option>
-                <option value="spielfuehrer">📋 Spielführer</option>
-              </select>
-            </div>
-
-            <button type="submit" style={{ ...buttonStyle, marginTop: 4 }}>Speichern</button>
-          </form>
-        </div>
-
-        {/* 2. AKTUELLE ZUORDNUNGEN & ROLLEN ÜBERSICHT */}
-        <div style={cardStyle}>
-          <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, margin: '0 0 12px' }}>
-            👥 Mannschaftsrollen
-          </h3>
-          {zuordnungen.length === 0 ? (
-            <p style={{ fontSize: 13, color: '#5B6D66' }}>Noch keine Zuordnungen vorhanden.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {zuordnungen.map(z => {
-                const sp = benutzerListe.find(b => b.id === z.benutzer_id)
-                return (
-                  <div key={z.id} style={{ padding: 10, background: '#F6FAF8', borderRadius: 8, border: '1px solid #DCE7E2', display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <span style={{ fontWeight: 700, fontSize: 13 }}>{sp ? `${sp.vorname} ${sp.nachname}` : 'Unbekannt'}</span>
-                      <button onClick={() => zuordnungEntfernen(z.id)} style={{ border: 'none', background: 'none', color: '#c0392b', cursor: 'pointer', fontSize: 14 }}>✕ Entfernen</button>
-                    </div>
-                    <div style={{ fontSize: 12, color: '#5B6D66' }}>
-                      Team: <strong>{z.mannschaften?.name}</strong>
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
-                      <span style={{ fontSize: 12, fontWeight: 600 }}>Rolle:</span>
-                      <select
-                        style={{ ...inputStyle, padding: '4px 8px', fontSize: 12, width: 'auto', flex: 1 }}
-                        value={z.rolle || 'spieler'}
-                        onChange={e => rolleAendern(z.id, e.target.value)}
-                      >
-                        <option value="spieler">🏓 Spieler</option>
-                        <option value="stellvertreter">🎗️ Stellv. Spielführer</option>
-                        <option value="spielfuehrer">📋 Spielführer</option>
-                      </select>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* 3. NUTZER- & ADMIN-RECHTE VERWALTUNG */}
-        <div style={cardStyle}>
-          <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, margin: '0 0 12px' }}>
-            👑 Admin-Rechte verwalten
-          </h3>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {benutzerListe.map(b => (
-              <div key={b.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #EFEFEF' }}>
+        {ladend ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#5B6D66' }}>Laden...</div>
+        ) : (
+          <>
+            {/* 1. MANNSCHAFT & ROLLE ZUWEISEN */}
+            <div style={{ background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 16, marginBottom: 24 }}>
+              <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, margin: '0 0 12px', color: '#1C8A4E' }}>
+                ➕ Mannschaft & Rolle zuweisen
+              </h3>
+              
+              <form onSubmit={zuweisungSpeichern} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
                 <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>{b.vorname} {b.nachname}</div>
-                  <div style={{ fontSize: 11, color: '#5B6D66' }}>{b.email}</div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#5B6D66' }}>Spieler</label>
+                  <select 
+                    value={selectedBenutzer} 
+                    onChange={e => setSelectedBenutzer(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #DCE7E2', background: '#FFFFFF', fontSize: 14 }}
+                  >
+                    {benutzerListe.map(b => (
+                      <option key={b.id} value={b.id}>{b.vorname} {b.nachname} ({b.email})</option>
+                    ))}
+                  </select>
                 </div>
-                <button
-                  onClick={() => toggleAdmin(b.id, b.ist_administrator)}
-                  style={{
-                    padding: '6px 12px', borderRadius: 6, border: 'none', fontSize: 12, fontWeight: 600, cursor: 'pointer',
-                    background: b.ist_administrator ? '#E8F5E9' : '#F0F4F2',
-                    color: b.ist_administrator ? '#1B5E20' : '#5B6D66'
-                  }}
-                >
-                  {b.ist_administrator ? '👑 Admin' : 'Nutzer'}
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
 
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#5B6D66' }}>Mannschaft</label>
+                  <select 
+                    value={selectedMannschaft} 
+                    onChange={e => setSelectedMannschaft(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #DCE7E2', background: '#FFFFFF', fontSize: 14 }}
+                  >
+                    {mannschaftenListe.map(m => (
+                      <option key={m.id} value={m.id}>{m.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', fontSize: 12, fontWeight: 600, marginBottom: 4, color: '#5B6D66' }}>Rolle in der Mannschaft</label>
+                  <select 
+                    value={selectedRolle} 
+                    onChange={e => setSelectedRolle(e.target.value)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: 8, border: '1px solid #DCE7E2', background: '#FFFFFF', fontSize: 14 }}
+                  >
+                    <option value="spielfuehrer">📋 Spielführer</option>
+                    <option value="stellvertreter">🎗️ Stellv. Spielführer</option>
+                    <option value="spieler">🏓 Spieler</option>
+                  </select>
+                </div>
+
+                <button 
+                  type="submit" 
+                  style={{ marginTop: 6, background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8, padding: 12, fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+                >
+                  Speichern
+                </button>
+              </form>
+            </div>
+
+            {/* 2. MANNSCHAFTSROLLEN (NACH TEAMS GEGRUPPIERT) */}
+            <h2 style={{ fontFamily: 'Sora, sans-serif', fontSize: 16, margin: '0 0 12px' }}>
+              👥 Mannschaftskader & Rollen
+            </h2>
+
+            {mannschaftenListe.map(m => {
+              const teamMembers = zuordnungen.filter(z => z.mannschaft_id === m.id)
+              return (
+                <div key={m.id} style={{ background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 16, marginBottom: 16 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, paddingBottom: 8, borderBottom: '1px solid #EFEFEF' }}>
+                    <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, margin: 0, color: '#1C8A4E' }}>
+                      🏓 {m.name}
+                    </h3>
+                    <span style={{ fontSize: 12, color: '#5B6D66', fontWeight: 500 }}>
+                      {teamMembers.length} {teamMembers.length === 1 ? 'Mitglied' : 'Mitglieder'}
+                    </span>
+                  </div>
+
+                  {teamMembers.length === 0 ? (
+                    <p style={{ fontSize: 13, color: '#5B6D66', margin: 0, fontStyle: 'italic' }}>Noch keine Spieler zugewiesen.</p>
+                  ) : (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {teamMembers.map(z => (
+                        <div key={z.id} style={{ background: '#F6FAF8', border: '1px solid #DCE7E2', borderRadius: 10, padding: 10 }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                            <span style={{ fontWeight: 600, fontSize: 14 }}>
+                              {z.benutzer?.vorname} {z.benutzer?.nachname}
+                            </span>
+                            <button 
+                              onClick={() => zuordnungEntfernen(z.id)}
+                              style={{ background: 'none', border: 'none', color: '#991B1B', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                            >
+                              ✕ Entfernen
+                            </button>
+                          </div>
+                          <select 
+                            value={z.rolle} 
+                            onChange={e => rolleAendern(z.id, e.target.value)}
+                            style={{ width: '100%', padding: '6px 8px', borderRadius: 6, border: '1px solid #DCE7E2', background: '#FFFFFF', fontSize: 13 }}
+                          >
+                            <option value="spielfuehrer">📋 Spielführer</option>
+                            <option value="stellvertreter">🎗️ Stellv. Spielführer</option>
+                            <option value="spieler">🏓 Spieler</option>
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </>
+        )}
       </div>
 
-      <BottomNav istAdmin={istAdmin} />
+      <BottomNav />
     </div>
   )
 }
 
 export default Admin
- 
