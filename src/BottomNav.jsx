@@ -40,7 +40,7 @@ export function BottomNav({ istAdmin }) {
         <span>Spiele</span>
       </Link>
 
-      <Link to="/chats" style={itemStyle(path.startsWith('/chats'))}>
+      <Link to="/chats" style={itemStyle(path.startsWith('/chat'))}>
         <span style={{ fontSize: 18 }}>💬</span>
         <span>Chats</span>
       </Link>
