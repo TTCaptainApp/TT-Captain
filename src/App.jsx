@@ -1,55 +1,58 @@
-import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+ import { useState, useEffect } from 'react'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
-import Registrierung from './Registrierung'
+
 import Login from './Login'
 import Dashboard from './Dashboard'
-import Mannschaften from './Mannschaften'
 import Spiele from './Spiele'
-import Aufstellung from './Aufstellung'
+import SpielDetail from './SpielDetail'
 import Chats from './Chats'
 import Chat from './Chat'
+import Mannschaften from './Mannschaften'
+import Profil from './Profil'
+import Admin from './Admin'
 
 function App() {
   const [session, setSession] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [ladend, setLadend] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session)
-      setLoading(false)
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setLadend(false)
     })
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession)
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
     })
-    return () => listener.subscription.unsubscribe()
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  if (loading) return null
+  if (ladend) return null
 
-  const params = new URLSearchParams(window.location.search)
-  const inviteCode = params.get('invite')
-
-  if (!session && inviteCode) {
-    return <Registrierung inviteCode={inviteCode} />
-  }
   if (!session) {
-    return <Login />
+    return (
+      <Routes>
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
+      </Routes>
+    )
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Dashboard session={session} />} />
-        <Route path="/mannschaften" element={<Mannschaften session={session} />} />
-        <Route path="/spiele" element={<Spiele session={session} />} />
-        <Route path="/spiele/:spielId/aufstellung" element={<Aufstellung session={session} />} />
-        <Route path="/chats" element={<Chats session={session} />} />
-        <Route path="/chats/mannschaft/:mannschaftId" element={<Chat session={session} />} />
-        <Route path="/chats/spiel/:spielId" element={<Chat session={session} />} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </BrowserRouter>
+    <Routes>
+      <Route path="/" element={<Dashboard session={session} />} />
+      <Route path="/spiele" element={<Spiele session={session} />} />
+      <Route path="/spiele/:id" element={<SpielDetail session={session} />} />
+      <Route path="/chats" element={<Chats session={session} />} />
+      <Route path="/chats/mannschaft/:mannschaftId" element={<Chat session={session} />} />
+      <Route path="/chats/spiel/:spielId" element={<Chat session={session} />} />
+      <Route path="/mannschaften" element={<Mannschaften session={session} />} />
+      <Route path="/profil" element={<Profil session={session} />} />
+      <Route path="/admin" element={<Admin session={session} />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
   )
 }
 
