@@ -186,6 +186,8 @@ function Aufstellung({ session }) {
     m.id !== session.user.id
   )
 
+  const qttrLexikon = Object.fromEntries(vereinsmitglieder.map(m => [m.id, m.qttr]))
+
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
       <div style={{ padding: '18px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff' }}>
@@ -242,7 +244,12 @@ function Aufstellung({ session }) {
                   display: 'flex', alignItems: 'center', gap: 8, padding: '8px 0',
                   borderTop: i > 0 ? '1px solid #DCE7E2' : 'none'
                 }}>
-                  <span style={{ fontSize: 14, flex: 1 }}><strong>{i + 1}.</strong> {a.name}</span>
+                  <span style={{ fontSize: 14, flex: 1 }}>
+                    <strong>{i + 1}.</strong> {a.name}
+                    {qttrLexikon[a.benutzer_id] != null && (
+                      <span style={{ color: '#5B6D66', fontSize: 12.5 }}> ({qttrLexikon[a.benutzer_id]} QTTR)</span>
+                    )}
+                  </span>
                   <button style={smallIconButtonStyle} onClick={() => nachObenVerschieben(i)} disabled={i === 0}>▲</button>
                   <button style={smallIconButtonStyle} onClick={() => nachUntenVerschieben(i)} disabled={i === ausgewaehlt.length - 1}>▼</button>
                   <button style={{ ...smallIconButtonStyle, color: '#c0392b' }} onClick={() => spielerEntfernen(a.benutzer_id)}>✕</button>
@@ -261,7 +268,12 @@ function Aufstellung({ session }) {
                 .filter(v => !ausgewaehlt.some(a => a.benutzer_id === v.benutzer_id))
                 .map(v => (
                   <div key={v.benutzer_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0' }}>
-                    <span style={{ fontSize: 14 }}>{v.name}</span>
+                    <span style={{ fontSize: 14 }}>
+                      {v.name}
+                      {qttrLexikon[v.benutzer_id] != null && (
+                        <span style={{ color: '#5B6D66', fontSize: 12.5 }}> ({qttrLexikon[v.benutzer_id]} QTTR)</span>
+                      )}
+                    </span>
                     <button style={secondaryButtonStyle} onClick={() => spielerHinzufuegen(v)}>+ Hinzufügen</button>
                   </div>
                 ))}
@@ -321,4 +333,4 @@ function Aufstellung({ session }) {
   )
 }
 
-export default Aufstellung
+export default Aufstellung 
