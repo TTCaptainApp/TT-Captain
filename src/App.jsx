@@ -2,13 +2,18 @@ import { useState, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
-// Komponenten-Imports
+// Alle Komponenten aus deiner Ordnerstruktur
 import Dashboard from './Dashboard'
 import Spiele from './Spiele'
 import SpielDetail from './SpielDetail'
+import Aufstellung from './Aufstellung'
+import Chats from './Chats'
+import Chat from './Chat'
+import Mannschaften from './Mannschaften'
 import Profil from './Profil'
 import Admin from './Admin'
 import Login from './Login'
+import Registrierung from './Registrierung'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -21,7 +26,7 @@ function App() {
       setLadend(false)
     })
 
-    // Auf Änderungen des Login-Status lauschen (Login/Logout)
+    // Auf Login/Logout Änderungen lauschen
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
     })
@@ -46,7 +51,7 @@ function App() {
     )
   }
 
-  // Wenn der Nutzer nicht eingeloggt ist, Login-Seite anzeigen
+  // Nicht eingeloggt? Login-Maske anzeigen
   if (!session) {
     return <Login />
   }
@@ -54,18 +59,28 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Hauptansichten */}
+        {/* Hauptübersichten */}
         <Route path="/" element={<Dashboard session={session} />} />
         <Route path="/spiele" element={<Spiele session={session} />} />
         
-        {/* Detailansicht für EIN Spiel & Aufstellung */}
+        {/* Spiel-Details & Aufstellung (deckt beide URL-Varianten ab) */}
         <Route path="/spiele/:spielId" element={<SpielDetail session={session} />} />
+        <Route path="/spiele/:spielId/aufstellung" element={<SpielDetail session={session} />} />
         
-        {/* Weitere Bereiche */}
+        {/* Falls Aufstellung.jsx separat genutzt werden soll */}
+        <Route path="/aufstellung/:spielId" element={<Aufstellung session={session} />} />
+
+        {/* Teams & Kommunikation */}
+        <Route path="/mannschaften" element={<Mannschaften session={session} />} />
+        <Route path="/chats" element={<Chats session={session} />} />
+        <Route path="/chat/:chatId" element={<Chat session={session} />} />
+
+        {/* Profil & Administration */}
         <Route path="/profil" element={<Profil session={session} />} />
         <Route path="/admin" element={<Admin session={session} />} />
+        <Route path="/registrierung" element={<Registrierung session={session} />} />
 
-        {/* Fallback bei allen unbekannten URLs -> zurück zum Dashboard */}
+        {/* Umleitung für unbekannte Pfade -> zurück zum Dashboard */}
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
