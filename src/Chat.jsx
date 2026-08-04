@@ -131,12 +131,12 @@ function Chat({ session }) {
         setTitel(chatTitel)
         setHatZugriff(zugriffErlaubt)
 
-        const spaltenFilter = istTeamChat ? { mannschaft_id: echteId } : { spiel_id: echteId }
+        // Nachrichten über chat_id laden und nach gesendet_am sortieren
         const { data: msgData } = await supabase
           .from('nachrichten')
           .select('*, benutzer:benutzer_id(vorname, nachname)')
-          .match(spaltenFilter)
-          .order('erstellt_am', { ascending: true })
+          .eq('chat_id', echteId)
+          .order('gesendet_am', { ascending: true })
 
         setNachrichten(msgData || [])
 
@@ -156,14 +156,13 @@ function Chat({ session }) {
     if (!neueNachricht.trim() || speichert) return
 
     setSpeichert(true)
-    const istTeamChat = chatId.startsWith('team_')
     const echteId = chatId.replace(/^(team_|spiel_)/, '')
 
     try {
       const payload = {
-        inhalt: neueNachricht,
+        text: neueNachricht,
         benutzer_id: session.user.id,
-        [istTeamChat ? 'mannschaft_id' : 'spiel_id']: echteId
+        chat_id: echteId
       }
 
       const { error } = await supabase
@@ -174,12 +173,11 @@ function Chat({ session }) {
 
       setNeueNachricht('')
       
-      const spaltenFilter = istTeamChat ? { mannschaft_id: echteId } : { spiel_id: echteId }
       const { data: msgData } = await supabase
         .from('nachrichten')
         .select('*, benutzer:benutzer_id(vorname, nachname)')
-        .match(spaltenFilter)
-        .order('erstellt_am', { ascending: true })
+        .eq('chat_id', echteId)
+        .order('gesendet_am', { ascending: true })
 
       setNachrichten(msgData || [])
       setTimeout(scrollToBottom, 100)
@@ -246,7 +244,7 @@ function Chat({ session }) {
                       wordBreak: 'break-word',
                       boxShadow: '0 1px 2px rgba(0,0,0,0.03)'
                     }}>
-                      {msg.inhalt}
+                      {msg.text}
                     </div>
                   </div>
                 )
@@ -284,3 +282,4 @@ function Chat({ session }) {
 }
 
 export default Chat
+ 
