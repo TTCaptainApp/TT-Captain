@@ -1,91 +1,56 @@
 import { useState, useEffect } from 'react'
-import { Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
-
-// Alle Komponenten aus deiner Ordnerstruktur
+import Registrierung from './Registrierung'
+import Login from './Login'
 import Dashboard from './Dashboard'
+import Mannschaften from './Mannschaften'
 import Spiele from './Spiele'
-import SpielDetail from './SpielDetail'
 import Aufstellung from './Aufstellung'
 import Chats from './Chats'
 import Chat from './Chat'
-import Mannschaften from './Mannschaften'
-import Profil from './Profil'
-import Admin from './Admin'
-import Login from './Login'
-import Registrierung from './Registrierung'
 
 function App() {
   const [session, setSession] = useState(null)
-  const [ladend, setLadend] = useState(true)
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setLadend(false)
+    supabase.auth.getSession().then(({ data }) => {
+      setSession(data.session)
+      setLoading(false)
     })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession)
     })
-
-    return () => subscription.unsubscribe()
+    return () => listener.subscription.unsubscribe()
   }, [])
 
-  if (ladend) {
-    return (
-      <div style={{ 
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
-        justifyContent: 'center', 
-        background: '#F6FAF8',
-        fontFamily: 'Inter, sans-serif',
-        color: '#1C8A4E',
-        fontWeight: 600
-      }}>
-        Wird geladen...
-      </div>
-    )
-  }
+  if (loading) return null
 
-  // Fall A: Nicht eingeloggt
+  const params = new URLSearchParams(window.location.search)
+  const inviteCode = params.get('invite')
+
+  if (!session && inviteCode) {
+    return <Registrierung inviteCode={inviteCode} />
+  }
   if (!session) {
-    return (
-      <Routes>
-        <Route path="/registrierung" element={<Registrierung />} />
-        <Route path="*" element={<Login />} />
-      </Routes>
-    )
+    return <Login />
   }
 
-  // Fall B: Eingeloggt
   return (
-    <Routes>
-      {/* Hauptansichten */}
-      <Route path="/" element={<Dashboard session={session} />} />
-      <Route path="/spiele" element={<Spiele session={session} />} />
-      
-      {/* Spiel-Details & Aufstellung */}
-      <Route path="/spiele/:spielId" element={<SpielDetail session={session} />} />
-      <Route path="/spiele/:spielId/aufstellung" element={<SpielDetail session={session} />} />
-      <Route path="/aufstellung/:spielId" element={<Aufstellung session={session} />} />
-
-      {/* Teams & Kommunikation */}
-      <Route path="/mannschaften" element={<Mannschaften session={session} />} />
-      <Route path="/chats" element={<Chats session={session} />} />
-      <Route path="/chat/:chatId" element={<Chat session={session} />} />
-
-      {/* Profil & Administration */}
-      <Route path="/profil" element={<Profil session={session} />} />
-      <Route path="/admin" element={<Admin session={session} />} />
-      <Route path="/registrierung" element={<Registrierung session={session} />} />
-
-      {/* Fallback */}
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Dashboard session={session} />} />
+        <Route path="/mannschaften" element={<Mannschaften session={session} />} />
+        <Route path="/spiele" element={<Spiele session={session} />} />
+        <Route path="/spiele/:spielId/aufstellung" element={<Aufstellung session={session} />} />
+        <Route path="/chats" element={<Chats session={session} />} />
+        <Route path="/chats/mannschaft/:mannschaftId" element={<Chat session={session} />} />
+        <Route path="/chats/spiel/:spielId" element={<Chat session={session} />} />
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
-export default App
- 
+export default App 
