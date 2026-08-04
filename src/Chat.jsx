@@ -1,12 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
-import Brand from './Brand'
 import BottomNav from './BottomNav'
-
-const buttonStyle = { background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }
-const iconButtonStyle = { background: '#F0F4F2', border: '1px solid #DCE7E2', borderRadius: 8, padding: '8px 12px', fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }
-const inputStyle = { flex: 1, padding: '10px 12px', fontSize: 14, borderRadius: 8, border: '1px solid #DCE7E2', fontFamily: 'inherit' }
 
 function Chat({ session }) {
   const { mannschaftId, spielId } = useParams()
@@ -21,7 +16,7 @@ function Chat({ session }) {
   const [hochladend, setHochladend] = useState(false)
   const [ladend, setLadend] = useState(true)
   const [fehler, setFehler] = useState(null)
-  
+
   const listeEndeRef = useRef(null)
   const fileInputRef = useRef(null)
 
@@ -112,7 +107,6 @@ function Chat({ session }) {
     listeEndeRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [nachrichten, bildVorschau])
 
-  // Bild auswählen
   const bildAuswaehlen = (e) => {
     const file = e.target.files[0]
     if (file) {
@@ -121,7 +115,6 @@ function Chat({ session }) {
     }
   }
 
-  // Standort senden
   const standortSenden = () => {
     if (!navigator.geolocation) {
       alert('Geolokalisierung wird von deinem Browser nicht unterstützt.')
@@ -150,7 +143,6 @@ function Chat({ session }) {
     )
   }
 
-  // Nachricht mit/ohne Bild senden
   const senden = async (e) => {
     e.preventDefault()
     if ((!text.trim() && !bildDatei) || !chatId || hochladend) return
@@ -158,7 +150,6 @@ function Chat({ session }) {
     setHochladend(true)
     let medienUrl = null
 
-    // Bild in Supabase Storage hochladen
     if (bildDatei) {
       const dateiEndung = bildDatei.name.split('.').pop()
       const dateiName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${dateiEndung}`
@@ -184,7 +175,6 @@ function Chat({ session }) {
       medien_url: medienUrl
     })
 
-    // Reset Formular
     setText('')
     setBildDatei(null)
     setBildVorschau(null)
@@ -197,118 +187,165 @@ function Chat({ session }) {
   if (ladend) return null
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ padding: '18px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff' }}>
-        <Brand size={16} />
+    <div style={{ minHeight: '100vh', background: '#EFEAE2', fontFamily: 'Inter, system-ui, sans-serif', color: '#111B21', display: 'flex', flexDirection: 'column' }}>
+      
+      {/* WHATSAPP TOP BAR */}
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: '#1C8A4E', color: 'white', padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 12, boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }}>
+        <Link to="/chats" style={{ color: 'white', textDecoration: 'none', fontSize: 22, fontWeight: 'bold', lineHeight: 1 }}>
+          ←
+        </Link>
+        <div style={{ flex: 1, overflow: 'hidden' }}>
+          <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 16, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+            {titel || 'Chat'}
+          </div>
+          <div style={{ fontSize: 11, opacity: 0.85 }}>{typ === 'mannschaft' ? 'Teamchat' : 'Spielchat'}</div>
+        </div>
       </div>
 
-      <div style={{ padding: '14px 20px', maxWidth: 480, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Link to="/chats" style={{ fontSize: 13, color: '#1C8A4E', fontWeight: 600, textDecoration: 'none' }}>← Zurück zu Chats</Link>
-        <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 18, margin: '10px 0 14px' }}>💬 {titel || 'Chat'}</h1>
-
+      <div style={{ padding: '14px 16px 120px', maxWidth: 480, margin: '0 auto', width: '100%', flex: 1, boxSizing: 'border-box' }}>
         {fehler ? (
           <div style={{ padding: 14, background: '#FDF2F2', border: '1px solid #F87171', borderRadius: 10, color: '#991B1B', marginTop: 10, fontSize: 13, fontWeight: 500 }}>
             ⛔ {fehler}
           </div>
         ) : (
-          <>
-            <div style={{ flex: 1, overflowY: 'auto', marginBottom: bildVorschau ? 150 : 100 }}>
-              {nachrichten.length === 0 && <p style={{ fontSize: 13, color: '#5B6D66' }}>Noch keine Nachrichten.</p>}
-              {nachrichten.map(n => {
-                const eigene = n.benutzer_id === session.user.id
-                return (
-                  <div key={n.id} style={{ display: 'flex', justifyContent: eigene ? 'flex-end' : 'flex-start', marginBottom: 12 }}>
-                    <div style={{
-                      maxWidth: '80%', background: eigene ? '#1C8A4E' : '#ffffff', color: eigene ? 'white' : '#16261F',
-                      border: eigene ? 'none' : '1px solid #DCE7E2', borderRadius: 12, padding: '8px 12px'
-                    }}>
-                      {!eigene && <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 2, color: '#1C8A4E' }}>{n.name}</div>}
-                      
-                      {/* BILD-ANZEIGE */}
-                      {n.medien_url && (
-                        <a href={n.medien_url} target="_blank" rel="noopener noreferrer">
-                          <img src={n.medien_url} alt="Anhang" style={{ width: '100%', borderRadius: 8, marginTop: 4, marginBottom: 4, maxHeight: 220, objectFit: 'cover' }} />
-                        </a>
-                      )}
-
-                      {/* STANDORT-ANZEIGE */}
-                      {n.standort_lat && n.standort_lng && (
-                        <div style={{ marginTop: 4, marginBottom: 4 }}>
-                          <a
-                            href={`https://www.google.com/maps?q=${n.standort_lat},${n.standort_lng}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            style={{
-                              display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px',
-                              background: eigene ? 'rgba(255,255,255,0.2)' : '#F0F4F2', color: eigene ? 'white' : '#1C8A4E',
-                              borderRadius: 8, textDecoration: 'none', fontSize: 12, fontWeight: 600
-                            }}
-                          >
-                            📍 In Google Maps öffnen ↗
-                          </a>
-                        </div>
-                      )}
-
-                      {n.text && <div style={{ fontSize: 14, wordBreak: 'break-word' }}>{n.text}</div>}
-                      <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2, textAlign: 'right' }}>
-                        {new Date(n.gesendet_am).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
+          <div>
+            {nachrichten.length === 0 && (
+              <div style={{ textAlign: 'center', margin: '20px 0' }}>
+                <span style={{ background: 'rgba(255,255,255,0.85)', padding: '6px 12px', borderRadius: 8, fontSize: 12, color: '#54656F', boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)' }}>
+                  🔒 Noch keine Nachrichten in diesem Chat.
+                </span>
+              </div>
+            )}
+            
+            {nachrichten.map(n => {
+              const eigene = n.benutzer_id === session.user.id
+              return (
+                <div key={n.id} style={{ display: 'flex', justifyContent: eigene ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
+                  <div style={{
+                    maxWidth: '82%',
+                    background: eigene ? '#D9FDD3' : '#FFFFFF',
+                    color: '#111B21',
+                    borderRadius: eigene ? '8px 8px 0px 8px' : '8px 8px 8px 0px',
+                    padding: '6px 10px 4px',
+                    boxShadow: '0 1px 0.5px rgba(11,20,26,0.13)',
+                    position: 'relative'
+                  }}>
+                    {/* ABSENDERNAME (Nur bei fremden Nachrichten) */}
+                    {!eigene && (
+                      <div style={{ fontSize: 12, fontWeight: 700, color: '#1C8A4E', marginBottom: 2 }}>
+                        {n.name}
                       </div>
+                    )}
+                    
+                    {/* BILD-ANZEIGE */}
+                    {n.medien_url && (
+                      <a href={n.medien_url} target="_blank" rel="noopener noreferrer">
+                        <img src={n.medien_url} alt="Anhang" style={{ width: '100%', borderRadius: 6, marginTop: 2, marginBottom: 4, maxHeight: 240, objectFit: 'cover' }} />
+                      </a>
+                    )}
+
+                    {/* STANDORT-ANZEIGE */}
+                    {n.standort_lat && n.standort_lng && (
+                      <div style={{ marginTop: 2, marginBottom: 4 }}>
+                        <a
+                          href={`https://www.google.com/maps?q=${n.standort_lat},${n.standort_lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{
+                            display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 10px',
+                            background: eigene ? '#C8F8BF' : '#F0F2F5', color: '#1C8A4E',
+                            borderRadius: 6, textDecoration: 'none', fontSize: 12, fontWeight: 600
+                          }}
+                        >
+                          📍 Standort auf Karte öffnen ↗
+                        </a>
+                      </div>
+                    )}
+
+                    {/* NACHRICHTENTEXT */}
+                    {n.text && (
+                      <div style={{ fontSize: 14, lineHeight: '1.35', wordBreak: 'break-word', paddingRight: eigene ? 35 : 35 }}>
+                        {n.text}
+                      </div>
+                    )}
+
+                    {/* UHRZEIT (Unten rechts wie bei WhatsApp) */}
+                    <div style={{
+                      fontSize: 10,
+                      color: '#667781',
+                      textAlign: 'right',
+                      marginTop: n.text ? -4 : 2,
+                      float: 'right',
+                      marginLeft: 12
+                    }}>
+                      {new Date(n.gesendet_am).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
-                )
-              })}
-              <div ref={listeEndeRef} />
-            </div>
-
-            {/* FORMULAR + TOOLBAR */}
-            <form
-              onSubmit={senden}
-              style={{
-                position: 'fixed', bottom: 60, left: 0, right: 0, background: '#ffffff',
-                borderTop: '1px solid #DCE7E2', padding: '10px 20px', display: 'flex', flexDirection: 'column', gap: 8,
-                maxWidth: 480, margin: '0 auto'
-              }}
-            >
-              {/* VORSCHAU-BEREICH FÜR FOTO */}
-              {bildVorschau && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#F6FAF8', padding: 6, borderRadius: 8 }}>
-                  <img src={bildVorschau} alt="Vorschau" style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 6 }} />
-                  <span style={{ fontSize: 12, color: '#5B6D66', flex: 1 }}>Foto angehängt</span>
-                  <button type="button" onClick={() => { setBildDatei(null); setBildVorschau(null) }} style={{ border: 'none', background: 'none', color: '#c0392b', fontSize: 16, cursor: 'pointer' }}>✕</button>
                 </div>
-              )}
-
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                {/* Unsichtbarer Input für Dateien */}
-                <input
-                  type="file"
-                  accept="image/*"
-                  ref={fileInputRef}
-                  style={{ display: 'none' }}
-                  onChange={bildAuswaehlen}
-                />
-
-                {/* Foto Button */}
-                <button type="button" onClick={() => fileInputRef.current?.click()} style={iconButtonStyle} title="Foto anhängen">
-                  📷
-                </button>
-
-                {/* Standort Button */}
-                <button type="button" onClick={standortSenden} style={iconButtonStyle} title="Standort senden">
-                  📍
-                </button>
-
-                {/* Text Input */}
-                <input style={inputStyle} placeholder="Nachricht..." value={text} onChange={e => setText(e.target.value)} />
-                
-                {/* Senden Button */}
-                <button type="submit" style={buttonStyle} disabled={hochladend}>
-                  {hochladend ? '...' : 'Senden'}
-                </button>
-              </div>
-            </form>
-          </>
+              )
+            })}
+            <div ref={listeEndeRef} />
+          </div>
         )}
+      </div>
+
+      {/* WHATSAPP FOOTER INPUT */}
+      <div style={{
+        position: 'fixed', bottom: 60, left: 0, right: 0, background: '#F0F2F5',
+        borderTop: '1px solid #E9EDEF', padding: '8px 12px',
+        maxWidth: 480, margin: '0 auto', boxSizing: 'border-box', zIndex: 10
+      }}>
+        {/* VORSCHAU-BEREICH FÜR FOTO */}
+        {bildVorschau && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10, background: '#FFFFFF', padding: '6px 10px', borderRadius: 8, marginBottom: 8, boxShadow: '0 1px 2px rgba(0,0,0,0.1)' }}>
+            <img src={bildVorschau} alt="Vorschau" style={{ width: 36, height: 36, objectFit: 'cover', borderRadius: 6 }} />
+            <span style={{ fontSize: 12, color: '#54656F', flex: 1 }}>Foto ausgewählt</span>
+            <button type="button" onClick={() => { setBildDatei(null); setBildVorschau(null) }} style={{ border: 'none', background: 'none', color: '#EA4335', fontSize: 16, cursor: 'pointer', padding: 4 }}>✕</button>
+          </div>
+        )}
+
+        <form onSubmit={senden} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          <input
+            type="file"
+            accept="image/*"
+            ref={fileInputRef}
+            style={{ display: 'none' }}
+            onChange={bildAuswaehlen}
+          />
+
+          {/* EINGABEFELD & ICONS IN EINER KAPSEL */}
+          <div style={{ flex: 1, display: 'flex', alignItems: 'center', background: '#FFFFFF', borderRadius: 24, padding: '4px 12px', border: '1px solid #E9EDEF' }}>
+            <input
+              style={{ flex: 1, border: 'none', outline: 'none', padding: '8px 4px', fontSize: 14, background: 'transparent', fontFamily: 'inherit' }}
+              placeholder="Nachricht..."
+              value={text}
+              onChange={e => setText(e.target.value)}
+            />
+            
+            {/* Foto Button */}
+            <button type="button" onClick={() => fileInputRef.current?.click()} style={{ border: 'none', background: 'none', fontSize: 18, cursor: 'pointer', padding: '4px 6px', opacity: 0.7 }} title="Foto anhängen">
+              📷
+            </button>
+
+            {/* Standort Button */}
+            <button type="button" onClick={standortSenden} style={{ border: 'none', background: 'none', fontSize: 18, cursor: 'pointer', padding: '4px 6px', opacity: 0.7 }} title="Standort senden">
+              📍
+            </button>
+          </div>
+
+          {/* RUNDER SENDE-BUTTON */}
+          <button
+            type="submit"
+            disabled={hochladend}
+            style={{
+              width: 42, height: 42, borderRadius: '50%', background: '#1C8A4E', color: 'white',
+              border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center',
+              fontSize: 16, cursor: 'pointer', flexShrink: 0, boxShadow: '0 1px 2px rgba(0,0,0,0.2)'
+            }}
+          >
+            {hochladend ? '...' : '➤'}
+          </button>
+        </form>
       </div>
 
       <BottomNav istAdmin={istAdmin} />
@@ -317,4 +354,3 @@ function Chat({ session }) {
 }
 
 export default Chat
- 
