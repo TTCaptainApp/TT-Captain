@@ -4,6 +4,8 @@ import { supabase } from './supabaseClient'
 import Brand from './Brand'
 import BottomNav from './BottomNav'
 
+const EMOJIS = ['😀','😂','👍','🙏','🏓','🔥','😉','😢','🎉','❤️','👏','🤔','😴','⏰','📍']
+
 function Chat({ session }) {
   const { mannschaftId, spielId } = useParams()
   const typ = mannschaftId ? 'mannschaft' : 'spiel'
@@ -14,6 +16,9 @@ function Chat({ session }) {
   const [text, setText] = useState('')
   const [ladend, setLadend] = useState(true)
   const [fehler, setFehler] = useState(null)
+  const [keinZugriff, setKeinZugriff] = useState(false)
+  const [zeigeEmojis, setZeigeEmojis] = useState(false)
+  const [medienHochladend, setMedienHochladend] = useState(false)
   const listeEndeRef = useRef(null)
 
   const nachrichtenLaden = async (cId) => {
@@ -22,7 +27,7 @@ function Chat({ session }) {
 
     const { data } = await supabase
       .from('nachrichten')
-      .select('id, benutzer_id, text, gesendet_am')
+      .select('id, benutzer_id, text, gesendet_am, medien_url, standort_lat, standort_lng')
       .eq('chat_id', cId)
       .order('gesendet_am')
 
@@ -46,6 +51,20 @@ function Chat({ session }) {
       if (s) {
         setTitel(s.heim_oder_auswaerts === 'heim' ? `${s.mannschaften?.name} vs. ${s.gegner}` : `${s.gegner} vs. ${s.mannschaften?.name}`)
       }
+
+      const { data: aufstellungCheck } = await supabase
+        .from('aufstellungen')
+        .select('id, aufstellung_spieler(benutzer_id)')
+        .eq('spiel_id', spielId)
+        .eq('veroeffentlicht', true)
+        .maybeSingle()
+      const berechtigt = aufstellungCheck?.aufstellung_spieler?.some(a => a.benutzer_id === session.user.id)
+      if (!berechtigt) {
+        setKeinZugriff(true)
+        setLadend(false)
+        return
+      }
+
       const { data } = await supabase.from('chats').select('id').eq('typ', 'spiel').eq('spiel_id', spielId).maybeSingle()
       bestehenderChat = data
     }
@@ -94,10 +113,48 @@ function Chat({ session }) {
     nachrichtenLaden(chatId)
   }
 
+  const emojiEinfuegen = (emoji) => {
+    setText(prev => prev + emoji)
+    setZeigeEmojis(false)
+  }
+
+  const fotoSenden = async (e) => {
+    const datei = e.target.files[0]
+    if (!datei || !chatId) return
+    setMedienHochladend(true)
+    const dateiPfad = `${chatId}/${Date.now()}_${datei.name}`
+    const { error: uploadError } = await supabase.storage.from('chat-medien').upload(dateiPfad, datei)
+    if (uploadError) { setFehler(uploadError.message); setMedienHochladend(false); return }
+    const { data: urlData } = supabase.storage.from('chat-medien').getPublicUrl(dateiPfad)
+    await supabase.from('nachrichten').insert({ chat_id: chatId, benutzer_id: session.user.id, text: '📷 Foto', medien_url: urlData.publicUrl })
+    setMedienHochladend(false)
+    nachrichtenLaden(chatId)
+  }
+
+  const standortSenden = () => {
+    if (!chatId || !navigator.geolocation) return
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      await supabase.from('nachrichten').insert({
+        chat_id: chatId, benutzer_id: session.user.id, text: '📍 Standort',
+        standort_lat: pos.coords.latitude, standort_lng: pos.coords.longitude
+      })
+      nachrichtenLaden(chatId)
+    }, () => setFehler('Standort konnte nicht ermittelt werden.'))
+  }
+
   if (ladend) {
     return (
       <div style={{ height: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#efeae2', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
         Lade Chat...
+      </div>
+    )
+  }
+
+  if (keinZugriff) {
+    return (
+      <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#efeae2', fontFamily: 'Inter, sans-serif', color: '#16261F', padding: 24, textAlign: 'center', gap: 12 }}>
+        <p>Dieser Spielchat ist nur für die aufgestellten Spieler sichtbar.</p>
+        <Link to="/chats" style={{ color: '#1C8A4E', fontWeight: 600 }}>← Zurück zu Chats</Link>
       </div>
     )
   }
@@ -135,7 +192,17 @@ function Chat({ session }) {
                   padding: '8px 12px 6px', borderRadius: eigene ? '7.5px 0 7.5px 7.5px' : '0 7.5px 7.5px 7.5px',
                   fontSize: 14, wordBreak: 'break-word', boxShadow: '0 1px 0.5px rgba(11,20,26,.13)'
                 }}>
-                  <div style={{ paddingRight: 40, lineHeight: 1.4 }}>{n.text}</div>
+                  {n.medien_url && (
+                    <img src={n.medien_url} alt="Foto" style={{ maxWidth: '100%', borderRadius: 8, marginBottom: 4, display: 'block' }} />
+                  )}
+                  {n.standort_lat && (
+                    <a href={`https://www.google.com/maps?q=${n.standort_lat},${n.standort_lng}`} target="_blank" rel="noreferrer" style={{ color: '#1C8A4E', fontWeight: 600, fontSize: 13 }}>
+                      📍 Standort öffnen
+                    </a>
+                  )}
+                  {!n.medien_url && !n.standort_lat && (
+                    <div style={{ paddingRight: 40, lineHeight: 1.4 }}>{n.text}</div>
+                  )}
                   <div style={{ fontSize: 10, color: '#667781', textAlign: 'right', marginTop: 2 }}>
                     {zeit}{eigene && <span style={{ color: '#53bdeb', fontWeight: 'bold', marginLeft: 4 }}>✓✓</span>}
                   </div>
@@ -147,6 +214,18 @@ function Chat({ session }) {
         <div ref={listeEndeRef} />
       </div>
 
+      {zeigeEmojis && (
+        <div style={{
+          position: 'fixed', bottom: 128, left: 0, right: 0, maxWidth: 480, margin: '0 auto',
+          background: '#ffffff', borderTop: '1px solid #DCE7E2', padding: 10, display: 'flex',
+          flexWrap: 'wrap', gap: 6, zIndex: 1000, boxSizing: 'border-box'
+        }}>
+          {EMOJIS.map(e => (
+            <button key={e} type="button" onClick={() => emojiEinfuegen(e)} style={{ fontSize: 20, border: 'none', background: 'none', cursor: 'pointer' }}>{e}</button>
+          ))}
+        </div>
+      )}
+
       <form
         onSubmit={senden}
         style={{
@@ -155,6 +234,15 @@ function Chat({ session }) {
           maxWidth: 480, margin: '0 auto', zIndex: 1000, boxSizing: 'border-box'
         }}
       >
+        <button type="button" onClick={() => setZeigeEmojis(z => !z)} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', flexShrink: 0 }}>😀</button>
+
+        <label style={{ cursor: 'pointer', flexShrink: 0, fontSize: 20 }}>
+          📷
+          <input type="file" accept="image/*" onChange={fotoSenden} style={{ display: 'none' }} disabled={medienHochladend} />
+        </label>
+
+        <button type="button" onClick={standortSenden} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', flexShrink: 0 }}>📍</button>
+
         <input
           type="text"
           placeholder="Nachricht..."
