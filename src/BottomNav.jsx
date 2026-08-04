@@ -5,6 +5,7 @@ function BottomNav({ istAdmin }) {
   const items = [
     { to: '/', label: 'Start', icon: '🏠' },
     { to: '/spiele', label: 'Spiele', icon: '📅' },
+    { to: '/chats', label: 'Chats', icon: '💬' },
   ]
   if (istAdmin) items.push({ to: '/mannschaften', label: 'Mannschaften', icon: '👥' })
 
@@ -15,7 +16,7 @@ function BottomNav({ istAdmin }) {
       zIndex: 10
     }}>
       {items.map(item => {
-        const active = location.pathname === item.to
+        const active = location.pathname === item.to || location.pathname.startsWith(item.to + '/')
         return (
           <Link
             key={item.to}
@@ -35,4 +36,4 @@ function BottomNav({ istAdmin }) {
   )
 }
 
-export default BottomNav
+export default BottomNav 
