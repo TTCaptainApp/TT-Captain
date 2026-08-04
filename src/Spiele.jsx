@@ -316,7 +316,6 @@ function Spiele({ session }) {
         )}
 
         {spiele.map(s => {
-          // Sicheres Auslesen: Supabase liefert bei 1:1 Bezeichnungen teilweise Objekte statt Arrays
           let veroeffentlichteAufstellung = null
           if (Array.isArray(s.aufstellungen)) {
             veroeffentlichteAufstellung = s.aufstellungen.find(a => a?.veroeffentlicht)
@@ -412,7 +411,7 @@ function Spiele({ session }) {
                         ❌ Absage
                       </button>
                       {!meineVerfuegbarkeiten[s.id] && <span style={{ fontSize: 11.5, color: '#5B6D66' }}>noch offen</span>}
-                      <Link to={`/spiele/${s.id}/aufstellung`} style={{ ...smallButtonStyle, textDecoration: 'none', display: 'inline-block' }}>
+                      <Link to={`/spiele/${s.id}`} style={{ ...smallButtonStyle, textDecoration: 'none', display: 'inline-block' }}>
                         📋 Aufstellung
                       </Link>
                     </div>
