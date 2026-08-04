@@ -1,190 +1,113 @@
-import { useState, useEffect, useRef } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
 import BottomNav from './BottomNav'
 
-const buttonStyle = { background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }
-const inputStyle = { flex: 1, padding: '10px 12px', fontSize: 14, borderRadius: 8, border: '1px solid #DCE7E2', fontFamily: 'inherit' }
+const cardStyle = { 
+  background: '#ffffff', 
+  border: '1px solid #DCE7E2', 
+  borderRadius: 14, 
+  padding: 14, 
+  marginBottom: 10 
+}
 
-function Chat({ session }) {
-  const { mannschaftId, spielId } = useParams()
-  const typ = mannschaftId ? 'mannschaft' : 'spiel'
+function Chats({ session }) {
   const [istAdmin, setIstAdmin] = useState(false)
-  const [titel, setTitel] = useState('')
-  const [chatId, setChatId] = useState(null)
-  const [nachrichten, setNachrichten] = useState([])
-  const [text, setText] = useState('')
+  const [teamChats, setTeamChats] = useState([])
+  const [spielChats, setSpielChats] = useState([])
   const [ladend, setLadend] = useState(true)
-  const [fehler, setFehler] = useState(null)
-  const listeEndeRef = useRef(null)
-
-  const nachrichtenLaden = async (cId) => {
-    const { data: namen } = await supabase.rpc('teamkollegen_namen')
-    const lex = Object.fromEntries((namen || []).map(n => [n.id, `${n.vorname} ${n.nachname}`]))
-
-    const { data } = await supabase
-      .from('nachrichten')
-      .select('id, benutzer_id, text, gesendet_am')
-      .eq('chat_id', cId)
-      .order('gesendet_am')
-
-    setNachrichten((data || []).map(n => ({ ...n, name: lex[n.benutzer_id] || (n.benutzer_id === session.user.id ? 'Du' : '?') })))
-  }
-
-  const initialisieren = async () => {
-    setLadend(true)
-    setFehler(null)
-
-    const { data: benutzerRow } = await supabase.from('benutzer').select('ist_administrator').eq('id', session.user.id).single()
-    const admin = benutzerRow?.ist_administrator || false
-    setIstAdmin(admin)
-
-    // 1. Berechtigungsprüfung vorab (für Nicht-Admins)
-    if (!admin) {
-      if (typ === 'mannschaft') {
-        const { data: z } = await supabase
-          .from('mannschaftszuordnungen')
-          .select('id')
-          .eq('benutzer_id', session.user.id)
-          .eq('mannschaft_id', mannschaftId)
-          .maybeSingle()
-
-        if (!z) {
-          setFehler('Du hast keinen Zugriff auf diesen Mannschaftschat.')
-          setLadend(false)
-          return
-        }
-      } else {
-        const { data: a } = await supabase
-          .from('aufstellung_spieler')
-          .select('id, aufstellungen!inner(veroeffentlicht, spiel_id)')
-          .eq('benutzer_id', session.user.id)
-          .eq('aufstellungen.spiel_id', spielId)
-          .eq('aufstellungen.veroeffentlicht', true)
-          .maybeSingle()
-
-        if (!a) {
-          setFehler('Du hast keinen Zugriff auf diesen Spielchat oder die Aufstellung ist noch nicht veröffentlicht.')
-          setLadend(false)
-          return
-        }
-      }
-    }
-
-    // 2. Chat laden oder erstellen
-    let bestehenderChat = null
-    if (typ === 'mannschaft') {
-      const { data: m } = await supabase.from('mannschaften').select('name').eq('id', mannschaftId).single()
-      setTitel(m?.name || 'Teamchat')
-      const { data } = await supabase.from('chats').select('id').eq('typ', 'mannschaft').eq('mannschaft_id', mannschaftId).maybeSingle()
-      bestehenderChat = data
-    } else {
-      const { data: s } = await supabase.from('spiele').select('gegner, heim_oder_auswaerts, mannschaften(name)').eq('id', spielId).single()
-      if (s) {
-        setTitel(s.heim_oder_auswaerts === 'heim' ? `${s.mannschaften?.name} vs. ${s.gegner}` : `${s.gegner} vs. ${s.mannschaften?.name}`)
-      }
-      const { data } = await supabase.from('chats').select('id').eq('typ', 'spiel').eq('spiel_id', spielId).maybeSingle()
-      bestehenderChat = data
-    }
-
-    let cId = bestehenderChat?.id
-    if (!cId) {
-      const insertPayload = typ === 'mannschaft'
-        ? { typ: 'mannschaft', mannschaft_id: mannschaftId }
-        : { typ: 'spiel', spiel_id: spielId }
-      const { data, error } = await supabase.from('chats').insert(insertPayload).select().single()
-      if (error) {
-        const { data: nochmal } = typ === 'mannschaft'
-          ? await supabase.from('chats').select('id').eq('typ', 'mannschaft').eq('mannschaft_id', mannschaftId).maybeSingle()
-          : await supabase.from('chats').select('id').eq('typ', 'spiel').eq('spiel_id', spielId).maybeSingle()
-        cId = nochmal?.id
-        if (!cId) { setFehler(error.message); setLadend(false); return }
-      } else {
-        cId = data.id
-      }
-    }
-
-    setChatId(cId)
-    await nachrichtenLaden(cId)
-    setLadend(false)
-  }
-
-  useEffect(() => { initialisieren() }, [mannschaftId, spielId, session])
 
   useEffect(() => {
-    if (!chatId) return
-    const intervall = setInterval(() => nachrichtenLaden(chatId), 5000)
-    return () => clearInterval(intervall)
-  }, [chatId])
+    const laden = async () => {
+      // 1. Admin-Status prüfen
+      const { data: benutzerRow } = await supabase
+        .from('benutzer')
+        .select('ist_administrator')
+        .eq('id', session.user.id)
+        .single()
+      
+      setIstAdmin(benutzerRow?.ist_administrator || false)
 
-  useEffect(() => {
-    listeEndeRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [nachrichten])
+      // 2. Teamchats laden und doppelte Zuordnungen (z.B. Spieler + Spielführer) herausfiltern
+      const { data: zuordnungen } = await supabase
+        .from('mannschaftszuordnungen')
+        .select('mannschaft_id, mannschaften(name)')
+        .eq('benutzer_id', session.user.id)
 
-  const senden = async (e) => {
-    e.preventDefault()
-    if (!text.trim() || !chatId) return
-    const inhalt = text.trim()
-    setText('')
-    const { error } = await supabase.from('nachrichten').insert({ chat_id: chatId, benutzer_id: session.user.id, text: inhalt })
-    if (error) { setFehler(error.message); return }
-    nachrichtenLaden(chatId)
-  }
+      const rawTeams = (zuordnungen || [])
+        .map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
+        .filter(t => t.mannschaft_id && t.name)
+
+      // Deduplizierung nach mannschaft_id
+      const eindeutigeTeams = Array.from(
+        new Map(rawTeams.map(t => [t.mannschaft_id, t])).values()
+      )
+
+      setTeamChats(eindeutigeTeams)
+
+      // 3. Spielchats über aufstellung_spieler + aufstellungen laden
+      const heute = new Date().toISOString().slice(0, 10)
+
+      const { data: eintraege } = await supabase
+        .from('aufstellung_spieler')
+        .select('aufstellungen!inner(spiel_id, veroeffentlicht, spiele!inner(id, gegner, heim_oder_auswaerts, datum, mannschaften(name)))')
+        .eq('benutzer_id', session.user.id)
+        .eq('aufstellungen.veroeffentlicht', true)
+        .gte('aufstellungen.spiele.datum', heute)
+
+      const gefilterteSpiele = (eintraege || [])
+        .map(e => e.aufstellungen?.spiele)
+        .filter(Boolean)
+
+      // Eindeutige Spiele herausfiltern
+      const mehraufhebung = Array.from(new Map(gefilterteSpiele.map(s => [s.id, s])).values())
+      mehraufhebung.sort((a, b) => new Date(a.datum) - new Date(b.datum))
+
+      setSpielChats(mehraufhebung)
+      setLadend(false)
+    }
+
+    laden()
+  }, [session])
 
   if (ladend) return null
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F', display: 'flex', flexDirection: 'column' }}>
+    <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
       <div style={{ padding: '18px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff' }}>
         <Brand size={16} />
       </div>
 
-      <div style={{ padding: '14px 20px', maxWidth: 480, margin: '0 auto', width: '100%', flex: 1, display: 'flex', flexDirection: 'column' }}>
-        <Link to="/chats" style={{ fontSize: 13, color: '#1C8A4E', fontWeight: 600, textDecoration: 'none' }}>← Zurück zu Chats</Link>
-        <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 18, margin: '10px 0 14px' }}>💬 {titel || 'Chat'}</h1>
+      <div style={{ padding: '20px 20px 80px', maxWidth: 480, margin: '0 auto' }}>
+        <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 20, margin: '8px 0 16px' }}>Chats</h1>
 
-        {fehler ? (
-          <div style={{ padding: 14, background: '#FDF2F2', border: '1px solid #F87171', borderRadius: 10, color: '#991B1B', marginTop: 10, fontSize: 13, fontWeight: 500 }}>
-            ⛔ {fehler}
-          </div>
-        ) : (
-          <>
-            <div style={{ flex: 1, overflowY: 'auto', marginBottom: 90 }}>
-              {nachrichten.length === 0 && <p style={{ fontSize: 13, color: '#5B6D66' }}>Noch keine Nachrichten.</p>}
-              {nachrichten.map(n => {
-                const eigene = n.benutzer_id === session.user.id
-                return (
-                  <div key={n.id} style={{ display: 'flex', justifyContent: eigene ? 'flex-end' : 'flex-start', marginBottom: 8 }}>
-                    <div style={{
-                      maxWidth: '75%', background: eigene ? '#1C8A4E' : '#ffffff', color: eigene ? 'white' : '#16261F',
-                      border: eigene ? 'none' : '1px solid #DCE7E2', borderRadius: 12, padding: '8px 12px'
-                    }}>
-                      {!eigene && <div style={{ fontSize: 11, fontWeight: 700, marginBottom: 2, color: '#1C8A4E' }}>{n.name}</div>}
-                      <div style={{ fontSize: 14 }}>{n.text}</div>
-                      <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>
-                        {new Date(n.gesendet_am).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-              <div ref={listeEndeRef} />
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5B6D66', textTransform: 'uppercase', letterSpacing: '.04em', margin: '4px 0 8px' }}>
+          Teamchats
+        </div>
+        {teamChats.map(t => (
+          <Link key={t.mannschaft_id} to={`/chats/mannschaft/${t.mannschaft_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div style={cardStyle}>
+              <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>💬 {t.name}</span>
             </div>
+          </Link>
+        ))}
+        {teamChats.length === 0 && <p style={{ fontSize: 13, color: '#5B6D66' }}>Keine Mannschaft zugeordnet.</p>}
 
-            <form
-              onSubmit={senden}
-              style={{
-                position: 'fixed', bottom: 60, left: 0, right: 0, background: '#ffffff',
-                borderTop: '1px solid #DCE7E2', padding: '10px 20px', display: 'flex', gap: 8,
-                maxWidth: 480, margin: '0 auto'
-              }}
-            >
-              <input style={inputStyle} placeholder="Nachricht..." value={text} onChange={e => setText(e.target.value)} />
-              <button type="submit" style={buttonStyle}>Senden</button>
-            </form>
-          </>
-        )}
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5B6D66', textTransform: 'uppercase', letterSpacing: '.04em', margin: '16px 0 8px' }}>
+          Spielchats
+        </div>
+        {spielChats.map(s => (
+          <Link key={s.id} to={`/chats/spiel/${s.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+            <div style={cardStyle}>
+              <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>
+                💬 {s.heim_oder_auswaerts === 'heim' ? `${s.mannschaften?.name} vs. ${s.gegner}` : `${s.gegner} vs. ${s.mannschaften?.name}`}
+              </span>
+              <div style={{ fontSize: 12, color: '#5B6D66', marginTop: 2 }}>{s.datum}</div>
+            </div>
+          </Link>
+        ))}
+        {spielChats.length === 0 && <p style={{ fontSize: 13, color: '#5B6D66' }}>Keine aktiven Spielchats (nur nach Veröffentlichung der Aufstellung sichtbar).</p>}
       </div>
 
       <BottomNav istAdmin={istAdmin} />
@@ -192,5 +115,5 @@ function Chat({ session }) {
   )
 }
 
-export default Chat
+export default Chats
  
