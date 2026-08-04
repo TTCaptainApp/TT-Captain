@@ -16,6 +16,60 @@ function Dashboard({ session }) {
   const [offeneSpiele, setOffeneSpiele] = useState([])
   const [alleAnzeigen, setAlleAnzeigen] = useState(false)
   const [ersatzanfragen, setErsatzanfragen] = useState([])
+  const [naechstesSpiel, setNaechstesSpiel] = useState(null)
+  const [naechsteVerfuegbarkeit, setNaechsteVerfuegbarkeit] = useState(null)
+  const [naechsteAufstellung, setNaechsteAufstellung] = useState(null)
+
+  const ladeNaechstesSpiel = async () => {
+    const { data: zuordnungen } = await supabase
+      .from('mannschaftszuordnungen')
+      .select('mannschaft_id')
+      .eq('benutzer_id', session.user.id)
+    const mannschaftIds = (zuordnungen || []).map(z => z.mannschaft_id)
+    if (mannschaftIds.length === 0) { setNaechstesSpiel(null); return }
+
+    const heute = new Date().toISOString().slice(0, 10)
+    const { data } = await supabase
+      .from('spiele')
+      .select('id, mannschaft_id, gegner, heim_oder_auswaerts, datum, uhrzeit, halle, mannschaften(name)')
+      .in('mannschaft_id', mannschaftIds)
+      .eq('status', 'geplant')
+      .gte('datum', heute)
+      .order('datum', { ascending: true })
+      .order('uhrzeit', { ascending: true })
+      .limit(1)
+
+    const spiel = data?.[0] || null
+    setNaechstesSpiel(spiel)
+    if (!spiel) { setNaechsteVerfuegbarkeit(null); setNaechsteAufstellung(null); return }
+
+    const { data: verf } = await supabase
+      .from('verfuegbarkeiten')
+      .select('status')
+      .eq('spiel_id', spiel.id)
+      .eq('benutzer_id', session.user.id)
+      .maybeSingle()
+    setNaechsteVerfuegbarkeit(verf?.status || null)
+
+    const { data: auf } = await supabase
+      .from('aufstellungen')
+      .select('id, veroeffentlicht')
+      .eq('spiel_id', spiel.id)
+      .maybeSingle()
+
+    if (auf?.veroeffentlicht) {
+      const { data: namen } = await supabase.rpc('teamkollegen_namen')
+      const lex = Object.fromEntries((namen || []).map(n => [n.id, `${n.vorname} ${n.nachname}`]))
+      const { data: spielerRows } = await supabase
+        .from('aufstellung_spieler')
+        .select('benutzer_id, position')
+        .eq('aufstellung_id', auf.id)
+        .order('position')
+      setNaechsteAufstellung((spielerRows || []).map(r => ({ ...r, name: lex[r.benutzer_id] || '?' })))
+    } else {
+      setNaechsteAufstellung(null)
+    }
+  }
 
   const ladeOffeneSpiele = async () => {
     const { data: zuordnungen } = await supabase
@@ -53,6 +107,12 @@ function Dashboard({ session }) {
     setErsatzanfragen(data || [])
   }
 
+  const ladeAlles = () => {
+    ladeNaechstesSpiel()
+    ladeOffeneSpiele()
+    ladeErsatzanfragen()
+  }
+
   useEffect(() => {
     supabase.from('benutzer').select('vorname, ist_administrator').eq('id', session.user.id).single()
       .then(({ data }) => {
@@ -61,8 +121,7 @@ function Dashboard({ session }) {
           setIstAdmin(data.ist_administrator)
         }
       })
-    ladeOffeneSpiele()
-    ladeErsatzanfragen()
+    ladeAlles()
   }, [session])
 
   const zusageSetzen = async (spielId, status) => {
@@ -70,7 +129,7 @@ function Dashboard({ session }) {
       { spiel_id: spielId, benutzer_id: session.user.id, status, geaendert_am: new Date().toISOString() },
       { onConflict: 'spiel_id,benutzer_id' }
     )
-    ladeOffeneSpiele()
+    ladeAlles()
   }
 
   const ersatzanfrageBeantworten = async (anfrageId, spielId, antwort) => {
@@ -84,11 +143,14 @@ function Dashboard({ session }) {
         { onConflict: 'spiel_id,benutzer_id' }
       )
     }
-    ladeErsatzanfragen()
+    ladeAlles()
   }
 
-  const sichtbareSpiele = alleAnzeigen ? offeneSpiele : offeneSpiele.slice(0, ANZAHL_SICHTBAR)
-  const versteckteAnzahl = offeneSpiele.length - sichtbareSpiele.length
+  // Das nächste Spiel wird oben separat gezeigt, daher aus der
+  // "Offene Rückmeldungen"-Liste herausfiltern (keine Dopplung)
+  const offeneOhneNaechstes = offeneSpiele.filter(s => s.id !== naechstesSpiel?.id)
+  const sichtbareSpiele = alleAnzeigen ? offeneOhneNaechstes : offeneOhneNaechstes.slice(0, ANZAHL_SICHTBAR)
+  const versteckteAnzahl = offeneOhneNaechstes.length - sichtbareSpiele.length
 
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
@@ -103,6 +165,64 @@ function Dashboard({ session }) {
         <p style={{ color: '#5B6D66', fontSize: 14, marginBottom: 20 }}>
           Schön, dass du dabei bist.
         </p>
+
+        {naechstesSpiel && (
+          <div style={{
+            background: '#1C8A4E', borderRadius: 16, padding: '18px 16px', marginBottom: 16, color: 'white'
+          }}>
+            <div style={{
+              fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700,
+              letterSpacing: '.06em', textTransform: 'uppercase', color: '#23D2A0', marginBottom: 6
+            }}>
+              Nächstes Spiel
+            </div>
+            <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 16 }}>
+              {naechstesSpiel.heim_oder_auswaerts === 'heim'
+                ? `${naechstesSpiel.mannschaften?.name} vs. ${naechstesSpiel.gegner}`
+                : `${naechstesSpiel.gegner} vs. ${naechstesSpiel.mannschaften?.name}`}
+            </div>
+            <div style={{ fontSize: 13, color: 'rgba(255,255,255,.85)', margin: '3px 0 12px' }}>
+              {naechstesSpiel.datum} {naechstesSpiel.uhrzeit ? `· ${naechstesSpiel.uhrzeit.slice(0, 5)} Uhr` : ''}
+              {naechstesSpiel.halle ? ` · ${naechstesSpiel.halle}` : ''}
+            </div>
+
+            {(!naechsteVerfuegbarkeit || naechsteVerfuegbarkeit === 'offen') && (
+              <div style={{ display: 'flex', gap: 8, marginBottom: naechsteAufstellung ? 14 : 0 }}>
+                <button
+                  onClick={() => zusageSetzen(naechstesSpiel.id, 'zugesagt')}
+                  style={{ ...smallButtonStyle, background: 'white', borderColor: 'white', color: '#1C8A4E' }}
+                >
+                  ✅ Zusage
+                </button>
+                <button
+                  onClick={() => zusageSetzen(naechstesSpiel.id, 'abgesagt')}
+                  style={{ ...smallButtonStyle, background: 'transparent', borderColor: 'rgba(255,255,255,.6)', color: 'white' }}
+                >
+                  ❌ Absage
+                </button>
+              </div>
+            )}
+            {naechsteVerfuegbarkeit === 'zugesagt' && (
+              <div style={{ fontSize: 13, marginBottom: naechsteAufstellung ? 14 : 0 }}>✅ Du hast zugesagt</div>
+            )}
+            {naechsteVerfuegbarkeit === 'abgesagt' && (
+              <div style={{ fontSize: 13, marginBottom: naechsteAufstellung ? 14 : 0 }}>❌ Du hast abgesagt</div>
+            )}
+
+            {naechsteAufstellung && (
+              <div style={{ background: 'rgba(255,255,255,.12)', borderRadius: 10, padding: '10px 12px' }}>
+                <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 6, color: '#23D2A0' }}>
+                  ✅ Aufstellung
+                </div>
+                {naechsteAufstellung.map((a, i) => (
+                  <div key={a.benutzer_id} style={{ fontSize: 13.5, padding: '2px 0' }}>
+                    <strong>{i + 1}.</strong> {a.name}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {ersatzanfragen.length > 0 && (
           <div style={{
@@ -138,7 +258,7 @@ function Dashboard({ session }) {
           </div>
         )}
 
-        {offeneSpiele.length > 0 && (
+        {offeneOhneNaechstes.length > 0 && (
           <div style={{
             background: '#ffffff', border: '2px solid #FF5A1F', borderRadius: 16,
             padding: '18px 16px', marginBottom: 16
@@ -147,7 +267,7 @@ function Dashboard({ session }) {
               fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700,
               letterSpacing: '.06em', textTransform: 'uppercase', color: '#FF5A1F', marginBottom: 10
             }}>
-              ⚠ Offene Rückmeldungen ({offeneSpiele.length})
+              ⚠ Weitere offene Rückmeldungen ({offeneOhneNaechstes.length})
             </div>
 
             {sichtbareSpiele.map(s => (
@@ -179,7 +299,7 @@ function Dashboard({ session }) {
                 + {versteckteAnzahl} weitere anzeigen
               </button>
             )}
-            {alleAnzeigen && offeneSpiele.length > ANZAHL_SICHTBAR && (
+            {alleAnzeigen && offeneOhneNaechstes.length > ANZAHL_SICHTBAR && (
               <button
                 onClick={() => setAlleAnzeigen(false)}
                 style={{ marginTop: 8, background: 'none', border: 'none', color: '#5B6D66', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0 }}
@@ -219,4 +339,4 @@ function Dashboard({ session }) {
   )
 }
 
-export default Dashboard
+export default Dashboard 
