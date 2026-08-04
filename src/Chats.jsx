@@ -4,7 +4,13 @@ import { supabase } from './supabaseClient'
 import Brand from './Brand'
 import BottomNav from './BottomNav'
 
-const cardStyle = { background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 14, marginBottom: 10 }
+const cardStyle = { 
+  background: '#ffffff', 
+  border: '1px solid #DCE7E2', 
+  borderRadius: 14, 
+  padding: 14, 
+  marginBottom: 10 
+}
 
 function Chats({ session }) {
   const [istAdmin, setIstAdmin] = useState(false)
@@ -15,16 +21,30 @@ function Chats({ session }) {
   useEffect(() => {
     const laden = async () => {
       // 1. Admin-Status prüfen
-      const { data: benutzerRow } = await supabase.from('benutzer').select('ist_administrator').eq('id', session.user.id).single()
+      const { data: benutzerRow } = await supabase
+        .from('benutzer')
+        .select('ist_administrator')
+        .eq('id', session.user.id)
+        .single()
+      
       setIstAdmin(benutzerRow?.ist_administrator || false)
 
-      // 2. Teamchats laden
+      // 2. Teamchats laden und doppelte Zuordnungen (z.B. Spieler + Spielführer) herausfiltern
       const { data: zuordnungen } = await supabase
         .from('mannschaftszuordnungen')
         .select('mannschaft_id, mannschaften(name)')
         .eq('benutzer_id', session.user.id)
-      const teams = (zuordnungen || []).map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
-      setTeamChats(teams)
+
+      const rawTeams = (zuordnungen || [])
+        .map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
+        .filter(t => t.mannschaft_id && t.name)
+
+      // Deduplizierung nach mannschaft_id
+      const eindeutigeTeams = Array.from(
+        new Map(rawTeams.map(t => [t.mannschaft_id, t])).values()
+      )
+
+      setTeamChats(eindeutigeTeams)
 
       // 3. Spielchats über aufstellung_spieler + aufstellungen laden
       const heute = new Date().toISOString().slice(0, 10)
@@ -47,6 +67,7 @@ function Chats({ session }) {
       setSpielChats(mehraufhebung)
       setLadend(false)
     }
+
     laden()
   }, [session])
 
@@ -95,4 +116,3 @@ function Chats({ session }) {
 }
 
 export default Chats
- 
