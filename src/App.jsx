@@ -1,4 +1,4 @@
- import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 
@@ -17,19 +17,32 @@ function App() {
   const [ladend, setLadend] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setLadend(false)
-    })
+    supabase.auth.getSession()
+      .then(({ data: { session } }) => {
+        setSession(session)
+      })
+      .catch((err) => {
+        console.error('Session-Fehler:', err)
+      })
+      .finally(() => {
+        setLadend(false)
+      })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
+      setLadend(false)
     })
 
     return () => subscription.unsubscribe()
   }, [])
 
-  if (ladend) return null
+  if (ladend) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', fontFamily: 'sans-serif', color: '#1C8A4E', fontWeight: 600 }}>
+        🔄 App lädt...
+      </div>
+    )
+  }
 
   if (!session) {
     return (
