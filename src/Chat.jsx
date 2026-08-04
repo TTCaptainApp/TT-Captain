@@ -3,45 +3,6 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
 
-const cardStyle = { 
-  background: '#ffffff', 
-  border: '1px solid #DCE7E2', 
-  borderRadius: 14, 
-  padding: 12, 
-  marginBottom: 8,
-  boxSizing: 'border-box'
-}
-
-const actionButtonStyle = {
-  background: '#ffffff',
-  border: '1px solid #DCE7E2',
-  borderRadius: 10,
-  width: 40,
-  height: 40,
-  fontSize: 18,
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flexShrink: 0
-}
-
-const primaryButtonStyle = { 
-  background: '#1C8A4E', 
-  color: 'white', 
-  border: 'none', 
-  borderRadius: 10, 
-  width: 40,
-  height: 40,
-  fontSize: 16, 
-  fontWeight: 600, 
-  cursor: 'pointer',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  flexShrink: 0
-}
-
 function Chat({ session }) {
   const { chatId } = useParams()
   const navigate = useNavigate()
@@ -206,62 +167,69 @@ function Chat({ session }) {
 
   if (ladend) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F6FAF8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
+      <div style={{ height: '100vh', background: '#efeae2', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
         Lade Chat...
       </div>
     )
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', overflowX: 'hidden', position: 'relative' }}>
+    <div style={{ height: '100vh', background: '#efeae2', fontFamily: 'Inter, sans-serif', color: '#16261F', display: 'flex', flexDirection: 'column', boxSizing: 'border-box', overflow: 'hidden', position: 'relative' }}>
       
-      {/* Header */}
-      <div style={{ position: 'sticky', top: 0, left: 0, right: 0, zIndex: 100, padding: '14px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box' }}>
+      {/* Fixierter Header oben */}
+      <div style={{ position: 'fixed', top: 0, left: 0, right: 0, height: 60, zIndex: 1000, padding: '0 16px', borderBottom: '1px solid #DCE7E2', background: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', boxSizing: 'border-box', maxWidth: 480, margin: '0 auto' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-          <button onClick={() => navigate('/chats')} style={{ background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', fontWeight: 700, color: '#1C8A4E', padding: 4 }}>
+          <button onClick={() => navigate('/chats')} style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', fontWeight: 700, color: '#1C8A4E', padding: 4, display: 'flex', alignItems: 'center' }}>
             ←
           </button>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#1C8A4E', textTransform: 'uppercase', letterSpacing: '.04em' }}>Chat</div>
-            <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, fontWeight: 700, color: '#16261F' }}>{titel}</div>
+          <div style={{ overflow: 'hidden' }}>
+            <div style={{ fontSize: 10, fontWeight: 700, color: '#1C8A4E', textTransform: 'uppercase', letterSpacing: '.04em' }}>Chat</div>
+            <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 14, fontWeight: 700, color: '#16261F', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 260 }}>{titel}</div>
           </div>
         </div>
         <Brand size={14} />
       </div>
 
-      {/* Inhalt */}
-      <div style={{ flex: 1, width: '100%', maxWidth: 480, margin: '0 auto', padding: '16px 20px 100px', boxSizing: 'border-box' }}>
+      {/* Scrollbarer Nachrichtenbereich (zwischen Header und Footer) */}
+      <div style={{ flex: 1, width: '100%', maxWidth: 480, margin: '0 auto', overflowY: 'auto', padding: '75px 16px 80px 16px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
         {!hatZugriff ? (
-          <div style={{ ...cardStyle, background: '#FDF2F2', border: '1px solid #F5C6CB', color: '#C0392B', textAlign: 'center', padding: 20 }}>
+          <div style={{ background: '#FDF2F2', border: '1px solid #F5C6CB', borderRadius: 12, color: '#C0392B', textAlign: 'center', padding: 20, marginTop: 20 }}>
             🚫 Du hast keinen Zugriff auf diesen Chat oder die Aufstellung ist noch nicht veröffentlicht.
           </div>
         ) : (
           <>
             {nachrichten.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#5B6D66', fontSize: 13, marginTop: 40 }}>
+              <div style={{ textAlign: 'center', color: '#667781', fontSize: 13, marginTop: 40, background: '#ffffff', padding: '12px 16px', borderRadius: 8, boxShadow: '0 1px 0.5px rgba(0,0,0,0.13)', alignSelf: 'center' }}>
                 Noch keine Nachrichten vorhanden. Schreib die erste Nachricht! 👇
               </div>
             ) : (
               nachrichten.map(msg => {
                 const istEigen = msg.benutzer_id === session.user.id
+                const zeit = msg.gesendet_am ? new Date(msg.gesendet_am).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''
                 return (
-                  <div key={msg.id || Math.random()} style={{ marginBottom: 12, display: 'flex', flexDirection: 'column', alignItems: istEigen ? 'flex-end' : 'flex-start' }}>
-                    <div style={{ fontSize: 11, color: '#5B6D66', marginBottom: 2, padding: '0 4px' }}>
-                      {istEigen ? 'Du' : `${msg.benutzer?.vorname || 'Mitglied'} ${msg.benutzer?.nachname || ''}`}
-                    </div>
+                  <div key={msg.id || Math.random()} style={{ marginBottom: 8, display: 'flex', flexDirection: 'column', alignItems: istEigen ? 'flex-end' : 'flex-start', width: '100%' }}>
+                    {!istEigen && (
+                      <div style={{ fontSize: 11, fontWeight: 600, color: '#1C8A4E', marginBottom: 2, padding: '0 4px' }}>
+                        {msg.benutzer?.vorname || 'Mitglied'} {msg.benutzer?.nachname || ''}
+                      </div>
+                    )}
                     <div style={{ 
-                      background: istEigen ? '#1C8A4E' : '#ffffff', 
-                      color: istEigen ? '#ffffff' : '#16261F',
-                      padding: '10px 14px',
-                      borderRadius: 12,
-                      border: istEigen ? 'none' : '1px solid #DCE7E2',
-                      maxWidth: '85%',
+                      background: istEigen ? '#E7FFDB' : '#ffffff', 
+                      color: '#111b21',
+                      padding: '8px 12px 6px 12px',
+                      borderRadius: istEigen ? '7.5px 0 7.5px 7.5px' : '0 7.5px 7.5px 7.5px',
+                      maxWidth: '80%',
                       fontSize: 14,
                       wordBreak: 'break-word',
-                      boxShadow: '0 1px 2px rgba(0,0,0,0.03)',
-                      boxSizing: 'border-box'
+                      boxShadow: '0 1px 0.5px rgba(11, 20, 26, 0.13)',
+                      boxSizing: 'border-box',
+                      position: 'relative'
                     }}>
-                      {msg.text}
+                      <div style={{ paddingRight: 45, lineHeight: 1.4 }}>{msg.text}</div>
+                      <div style={{ fontSize: 10, color: '#667781', float: 'right', marginTop: 2, marginLeft: 8, display: 'flex', alignItems: 'center', gap: 2 }}>
+                        {zeit}
+                        {istEigen && <span style={{ color: '#53bdeb', fontWeight: 'bold', fontSize: 11 }}>✓✓</span>}
+                      </div>
                     </div>
                   </div>
                 )
@@ -272,23 +240,23 @@ function Chat({ session }) {
         )}
       </div>
 
-      {/* Eingabefeld unten */}
+      {/* Fixiertes Eingabefeld unten */}
       {hatZugriff && (
-        <form onSubmit={nachrichtSenden} style={{ position: 'fixed', bottom: 0, left: 0, right: 0, background: '#ffffff', borderTop: '1px solid #DCE7E2', padding: '10px 16px', display: 'flex', gap: 8, alignItems: 'center', maxWidth: 480, margin: '0 auto', zIndex: 100, boxSizing: 'border-box' }}>
+        <form onSubmit={nachrichtSenden} style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 64, background: '#f0f2f5', borderTop: '1px solid #DCE7E2', padding: '8px 12px', display: 'flex', gap: 8, alignItems: 'center', maxWidth: 480, margin: '0 auto', zIndex: 1000, boxSizing: 'border-box' }}>
           <input
             type="text"
-            placeholder="Nachricht schreiben..."
+            placeholder="Nachricht"
             value={neueNachricht}
             onChange={e => setNeueNachricht(e.target.value)}
-            style={{ flex: 1, padding: '10px 14px', borderRadius: 10, border: '1px solid #DCE7E2', fontSize: 14, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', background: '#F6FAF8', color: '#16261F' }}
+            style={{ flex: 1, padding: '10px 14px', borderRadius: 24, border: 'none', fontSize: 14, outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box', background: '#ffffff', color: '#111b21', boxShadow: '0 1px 0.5px rgba(11, 20, 26, 0.13)' }}
           />
-          <button type="button" title="Foto anhängen" style={actionButtonStyle}>
+          <button type="button" title="Foto anhängen" style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#54656f' }}>
             📷
           </button>
-          <button type="button" title="Standort anhängen" style={actionButtonStyle}>
+          <button type="button" title="Standort anhängen" style={{ background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: 6, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#54656f' }}>
             📍
           </button>
-          <button type="submit" disabled={speichert || !neueNachricht.trim()} style={{ ...primaryButtonStyle, opacity: !neueNachricht.trim() ? 0.5 : 1 }}>
+          <button type="submit" disabled={speichert || !neueNachricht.trim()} style={{ background: '#00a884', color: 'white', border: 'none', borderRadius: '50%', width: 42, height: 42, fontSize: 16, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, opacity: !neueNachricht.trim() ? 0.6 : 1 }}>
             ➤
           </button>
         </form>
