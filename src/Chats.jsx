@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
@@ -12,71 +12,45 @@ function Chats({ session }) {
   const [spielChats, setSpielChats] = useState([])
   const [ladend, setLadend] = useState(true)
 
-    useEffect(() => {
+  useEffect(() => {
     const laden = async () => {
-      try {
-        const { data: benutzerRow } = await supabase
-          .from('benutzer')
-          .select('ist_administrator')
-          .eq('id', session.user.id)
-          .maybeSingle()
-        setIstAdmin(benutzerRow?.ist_administrator || false)
+      const { data: benutzerRow } = await supabase.from('benutzer').select('ist_administrator').eq('id', session.user.id).single()
+      setIstAdmin(benutzerRow?.ist_administrator || false)
 
-        const { data: zuordnungen } = await supabase
-          .from('mannschaftszuordnungen')
-          .select('mannschaft_id, mannschaften(name)')
-          .eq('benutzer_id', session.user.id)
-        
-        const teams = (zuordnungen || []).map(z => ({ 
-          mannschaft_id: z.mannschaft_id, 
-          name: z.mannschaften?.name || 'Mannschaft' 
-        }))
-        setTeamChats(teams)
+      const { data: zuordnungen } = await supabase
+        .from('mannschaftszuordnungen')
+        .select('mannschaft_id, mannschaften(name)')
+        .eq('benutzer_id', session.user.id)
+      const teams = (zuordnungen || []).map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
+      setTeamChats(teams)
 
-        const mannschaftIds = teams.map(t => t.mannschaft_id)
-        const heute = new Date().toISOString().slice(0, 10)
+      const mannschaftIds = teams.map(t => t.mannschaft_id)
+      const heute = new Date().toISOString().slice(0, 10)
 
-        let eigeneSpiele = []
-        if (mannschaftIds.length > 0) {
-          try {
-            const { data } = await supabase
-              .from('spiele')
-              .select('id, gegner, heim_oder_auswaerts, datum, mannschaften(name)')
-              .in('mannschaft_id', mannschaftIds)
-              .gte('datum', heute)
-              .order('datum')
-            eigeneSpiele = data || []
-          } catch (e) {
-            console.log('Spiele-Tabelle noch nicht aktiv')
-          }
-        }
-
-        let ersatzListe = []
-        try {
-          const { data: ersatzSpiele } = await supabase
-            .from('ersatzanfragen')
-            .select('spiel_id, spiele(id, gegner, heim_oder_auswaerts, datum, mannschaften(name))')
-            .eq('angefragter_benutzer_id', session.user.id)
-            .eq('status', 'zugesagt')
-          
-          if (ersatzSpiele) {
-            ersatzListe = ersatzSpiele.filter(e => e.spiele).map(e => e.spiele)
-          }
-        } catch (e) {
-          console.log('Ersatzanfragen noch nicht aktiv')
-        }
-
-        const alleSpiele = [...eigeneSpiele, ...ersatzListe.filter(s => !eigeneSpiele.some(es => es.id === s.id))]
-        setSpielChats(alleSpiele)
-      } catch (err) {
-        console.error('Fehler beim Laden der Chat-Übersicht:', err)
-      } finally {
-        setLadend(false)
+      let eigeneSpiele = []
+      if (mannschaftIds.length > 0) {
+        const { data } = await supabase
+          .from('spiele')
+          .select('id, gegner, heim_oder_auswaerts, datum, mannschaften(name)')
+          .in('mannschaft_id', mannschaftIds)
+          .gte('datum', heute)
+          .order('datum')
+        eigeneSpiele = data || []
       }
+
+      const { data: ersatzSpiele } = await supabase
+        .from('ersatzanfragen')
+        .select('spiel_id, spiele(id, gegner, heim_oder_auswaerts, datum, mannschaften(name))')
+        .eq('angefragter_benutzer_id', session.user.id)
+        .eq('status', 'zugesagt')
+
+      const ersatzListe = (ersatzSpiele || []).filter(e => e.spiele).map(e => e.spiele)
+      const alleSpiele = [...eigeneSpiele, ...ersatzListe.filter(s => !eigeneSpiele.some(es => es.id === s.id))]
+      setSpielChats(alleSpiele)
+      setLadend(false)
     }
     laden()
   }, [session])
-
 
   if (ladend) return null
 
