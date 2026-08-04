@@ -20,7 +20,6 @@ function Chats({ session }) {
 
   useEffect(() => {
     const laden = async () => {
-      // 1. Admin-Status prüfen
       const { data: benutzerRow } = await supabase
         .from('benutzer')
         .select('ist_administrator')
@@ -29,7 +28,6 @@ function Chats({ session }) {
       
       setIstAdmin(benutzerRow?.ist_administrator || false)
 
-      // 2. Teamchats laden und doppelte Zuordnungen (z.B. Spieler + Spielführer) herausfiltern
       const { data: zuordnungen } = await supabase
         .from('mannschaftszuordnungen')
         .select('mannschaft_id, mannschaften(name)')
@@ -39,14 +37,12 @@ function Chats({ session }) {
         .map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
         .filter(t => t.mannschaft_id && t.name)
 
-      // Deduplizierung nach mannschaft_id
       const eindeutigeTeams = Array.from(
         new Map(rawTeams.map(t => [t.mannschaft_id, t])).values()
       )
 
       setTeamChats(eindeutigeTeams)
 
-      // 3. Spielchats über aufstellung_spieler + aufstellungen laden
       const heute = new Date().toISOString().slice(0, 10)
 
       const { data: eintraege } = await supabase
@@ -60,7 +56,6 @@ function Chats({ session }) {
         .map(e => e.aufstellungen?.spiele)
         .filter(Boolean)
 
-      // Eindeutige Spiele herausfiltern
       const mehraufhebung = Array.from(new Map(gefilterteSpiele.map(s => [s.id, s])).values())
       mehraufhebung.sort((a, b) => new Date(a.datum) - new Date(b.datum))
 
@@ -86,7 +81,7 @@ function Chats({ session }) {
           Teamchats
         </div>
         {teamChats.map(t => (
-          <Link key={t.mannschaft_id} to={`/chats/mannschaft/${t.mannschaft_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Link key={t.mannschaft_id} to={`/chat/team_${t.mannschaft_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
             <div style={cardStyle}>
               <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>💬 {t.name}</span>
             </div>
@@ -98,7 +93,7 @@ function Chats({ session }) {
           Spielchats
         </div>
         {spielChats.map(s => (
-          <Link key={s.id} to={`/chats/spiel/${s.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Link key={s.id} to={`/chat/spiel_${s.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
             <div style={cardStyle}>
               <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>
                 💬 {s.heim_oder_auswaerts === 'heim' ? `${s.mannschaften?.name} vs. ${s.gegner}` : `${s.gegner} vs. ${s.mannschaften?.name}`}
@@ -116,4 +111,3 @@ function Chats({ session }) {
 }
 
 export default Chats
- 
