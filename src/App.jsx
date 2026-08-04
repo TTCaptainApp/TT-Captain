@@ -18,21 +18,57 @@ import Registrierung from './Registrierung'
 function App() {
   const [session, setSession] = useState(null)
   const [ladend, setLadend] = useState(true)
+  const [handyFehler, setHandyFehler] = useState(null)
 
   useEffect(() => {
-    // Aktuelle Session beim Start abrufen
+    // Fehler auf dem Handy abfangen und auf dem Bildschirm anzeigen
+    const fehlerCatcher = (e) => {
+      setHandyFehler(e.error?.message || e.message || 'Unbekannter Fehler')
+    }
+    const rejectionCatcher = (e) => {
+      setHandyFehler(e.reason?.message || String(e.reason))
+    }
+
+    window.addEventListener('error', fehlerCatcher)
+    window.addEventListener('unhandledrejection', rejectionCatcher)
+
+    // Session beim Start laden
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
       setLadend(false)
+    }).catch(err => {
+      setHandyFehler('Supabase Fehler: ' + err.message)
+      setLadend(false)
     })
 
-    // Auf Login/Logout Änderungen lauschen
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      window.removeEventListener('error', fehlerCatcher)
+      window.removeEventListener('unhandledrejection', rejectionCatcher)
+      subscription.unsubscribe()
+    }
   }, [])
+
+  // Falls auf dem Handy ein JavaScript-Fehler passiert -> Fehlermeldung rot anzeigen
+  if (handyFehler) {
+    return (
+      <div style={{ padding: 20, color: '#c0392b', background: '#fdf2f2', minHeight: '100vh', fontFamily: 'sans-serif' }}>
+        <h3 style={{ marginTop: 0 }}>⚠️ Fehler aufgetreten:</h3>
+        <pre style={{ background: '#fff', padding: 12, borderRadius: 8, border: '1px solid #f5c6cb', whiteSpace: 'pre-wrap', wordBreak: 'break-all', fontSize: 13 }}>
+          {handyFehler}
+        </pre>
+        <button 
+          onClick={() => window.location.reload()} 
+          style={{ background: '#1C8A4E', color: 'white', border: 'none', padding: '10px 16px', borderRadius: 8, fontWeight: 600, cursor: 'pointer', marginTop: 10 }}
+        >
+          Neu laden
+        </button>
+      </div>
+    )
+  }
 
   if (ladend) {
     return (
@@ -53,42 +89,38 @@ function App() {
 
   return (
     <BrowserRouter>
-      <Routes>
-        {!session ? (
-          /* Routen für NICHT-eingeloggte Benutzer */
-          <>
-            <Route path="/registrierung" element={<Registrierung />} />
-            <Route path="*" element={<Login />} />
-          </>
-        ) : (
-          /* Routen für EINGELOGGTE Benutzer */
-          <>
-            <Route path="/" element={<Dashboard session={session} />} />
-            <Route path="/spiele" element={<Spiele session={session} />} />
-            
-            {/* Spiel-Details & Aufstellung */}
-            <Route path="/spiele/:spielId" element={<SpielDetail session={session} />} />
-            <Route path="/spiele/:spielId/aufstellung" element={<SpielDetail session={session} />} />
-            <Route path="/aufstellung/:spielId" element={<Aufstellung session={session} />} />
+      {!session ? (
+        <Routes>
+          <Route path="/registrierung" element={<Registrierung />} />
+          <Route path="*" element={<Login />} />
+        </Routes>
+      ) : (
+        <Routes>
+          {/* Hauptansichten */}
+          <Route path="/" element={<Dashboard session={session} />} />
+          <Route path="/spiele" element={<Spiele session={session} />} />
+          
+          {/* Spiel-Details & Aufstellung */}
+          <Route path="/spiele/:spielId" element={<SpielDetail session={session} />} />
+          <Route path="/spiele/:spielId/aufstellung" element={<SpielDetail session={session} />} />
+          <Route path="/aufstellung/:spielId" element={<Aufstellung session={session} />} />
 
-            {/* Teams & Kommunikation */}
-            <Route path="/mannschaften" element={<Mannschaften session={session} />} />
-            <Route path="/chats" element={<Chats session={session} />} />
-            <Route path="/chat/:chatId" element={<Chat session={session} />} />
+          {/* Teams & Kommunikation */}
+          <Route path="/mannschaften" element={<Mannschaften session={session} />} />
+          <Route path="/chats" element={<Chats session={session} />} />
+          <Route path="/chat/:chatId" element={<Chat session={session} />} />
 
-            {/* Profil & Administration */}
-            <Route path="/profil" element={<Profil session={session} />} />
-            <Route path="/admin" element={<Admin session={session} />} />
-            <Route path="/registrierung" element={<Registrierung session={session} />} />
+          {/* Profil & Administration */}
+          <Route path="/profil" element={<Profil session={session} />} />
+          <Route path="/admin" element={<Admin session={session} />} />
+          <Route path="/registrierung" element={<Registrierung session={session} />} />
 
-            {/* Fallback bei unbekannten URLs */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </>
-        )}
-      </Routes>
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      )}
     </BrowserRouter>
   )
 }
 
 export default App
- 
