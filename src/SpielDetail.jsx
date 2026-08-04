@@ -4,9 +4,49 @@ import { supabase } from './supabaseClient'
 import Brand from './Brand'
 import BottomNav from './BottomNav'
 
-const cardStyle = { background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 16, marginBottom: 14 }
-const buttonStyle = { background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }
-const secondaryButtonStyle = { ...buttonStyle, background: 'transparent', color: '#1C8A4E', border: '1px solid #1C8A4E' }
+// Mobile-First Styling Essentials
+const cardStyle = { 
+  background: '#ffffff', 
+  border: '1px solid #DCE7E2', 
+  borderRadius: 14, 
+  padding: 16, 
+  marginBottom: 14,
+  boxShadow: '0 1px 4px rgba(0,0,0,0.03)'
+}
+
+const primaryButtonStyle = { 
+  background: '#1C8A4E', 
+  color: 'white', 
+  border: 'none', 
+  borderRadius: 10, 
+  padding: '12px 16px', 
+  fontSize: 14, 
+  fontWeight: 600, 
+  cursor: 'pointer',
+  minHeight: 44, // Touch-Target Minimum
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  width: '100%'
+}
+
+const secondaryButtonStyle = { 
+  ...primaryButtonStyle, 
+  background: 'transparent', 
+  color: '#1C8A4E', 
+  border: '1px solid #1C8A4E' 
+}
+
+const selectStyle = { 
+  padding: '10px 12px', 
+  fontSize: 14, 
+  borderRadius: 8, 
+  border: '1px solid #DCE7E2', 
+  width: '100%', 
+  fontFamily: 'inherit', 
+  background: '#fff',
+  minHeight: 44
+}
 
 function SpielDetail({ session }) {
   const { spielId } = useParams()
@@ -14,11 +54,12 @@ function SpielDetail({ session }) {
 
   const [spiel, setSpiel] = useState(null)
   const [verfuegbarkeiten, setVerfuegbarkeiten] = useState([])
+  const [ersatzAnfragen, setErsatzAnfragen] = useState([])
+  const [alleBenutzer, setAlleBenutzer] = useState([])
+  const [ausgewaehlterErsatz, setAusgewaehlterErsatz] = useState('')
+
   const [aufstellung, setAufstellung] = useState(null)
-  
-  // Array von Spieler-IDs in der genauen Reihenfolge (Index 0 = Pos 1, Index 1 = Pos 2, ...)
   const [aufstellungSpielerIds, setAufstellungSpielerIds] = useState([])
-  
   const [istVeroeffentlicht, setIstVeroeffentlicht] = useState(false)
   const [draggedIndex, setDraggedIndex] = useState(null)
 
@@ -31,7 +72,7 @@ function SpielDetail({ session }) {
   const ladeDaten = async () => {
     setLadend(true)
     
-    // 1. Spiel laden
+    // 1. Spiel-Informationen
     const { data: spielData, error: spielError } = await supabase
       .from('spiele')
       .select('*, mannschaften(name)')
@@ -45,7 +86,7 @@ function SpielDetail({ session }) {
     }
     setSpiel(spielData)
 
-    // 2. Rechte prüfen
+    // 2. Rechte-Check
     const { data: adminData } = await supabase
       .from('benutzer')
       .select('ist_administrator')
@@ -65,17 +106,12 @@ function SpielDetail({ session }) {
       setIstSpielfuehrer(true)
     }
 
-    // 3. Zusagen/Absagen laden
+    // 3. Stammspieler Verfügbarkeiten
     const { data: verfData } = await supabase
       .from('verfuegbarkeiten')
       .select(`
         status,
-        benutzer:benutzer_id (
-          id,
-          vorname,
-          nachname,
-          qttr
-        )
+        benutzer:benutzer_id ( id, vorname, nachname, qttr )
       `)
       .eq('spiel_id', spielId)
 
@@ -85,16 +121,38 @@ function SpielDetail({ session }) {
     }))
     setVerfuegbarkeiten(aufbereitet)
 
-    // 4. Bisherige Aufstellung laden
+    // 4. Ersatzspieler-Anfragen laden
+    const { data: ersatzData } = await supabase
+      .from('ersatz_anfragen')
+      .select(`
+        id,
+        status,
+        benutzer:benutzer_id ( id, vorname, nachname, qttr )
+      `)
+      .eq('spiel_id', spielId)
+
+    const aufbereiteteErsatz = (ersatzData || []).map(e => ({
+      anfrageId: e.id,
+      status: e.status,
+      ...(Array.isArray(e.benutzer) ? e.benutzer[0] : e.benutzer)
+    }))
+    setErsatzAnfragen(aufbereiteteErsatz)
+
+    // 5. Alle Benutzer laden für Ersatzspieler-Dropdown
+    const { data: benutzerData } = await supabase
+      .from('benutzer')
+      .select('id, vorname, nachname, qttr')
+      .order('nachname', { ascending: true })
+
+    setAlleBenutzer(benutzerData || [])
+
+    // 6. Bisherige Aufstellung
     const { data: aufstellungsData } = await supabase
       .from('aufstellungen')
       .select(`
         id,
         veroeffentlicht,
-        aufstellung_spieler (
-          position,
-          benutzer_id
-        )
+        aufstellung_spieler ( position, benutzer_id )
       `)
       .eq('spiel_id', spielId)
       .single()
@@ -118,24 +176,22 @@ function SpielDetail({ session }) {
     ladeDaten()
   }, [spielId])
 
-  // Zusagen geordnet nach QTTR
-  const zusagen = verfuegbarkeiten
-    .filter(v => v.status === 'zugesagt')
-    .sort((a, b) => (b.qttr || 0) - (a.qttr || 0))
-
   const kannBearbeiten = istAdmin || istSpielfuehrer
 
-  // Klick auf Spieler in der Zusagen-Liste (Hinzufügen oder Entfernen)
+  // Zusagen inkl. zugesagter Ersatzspieler
+  const zusagenStamm = verfuegbarkeiten.filter(v => v.status === 'zugesagt')
+  const zusagenErsatz = ersatzAnfragen.filter(e => e.status === 'zugesagt')
+  const alleZusagen = [...zusagenStamm, ...zusagenErsatz].sort((a, b) => (b.qttr || 0) - (a.qttr || 0))
+
+  // Klick auf Spieler -> In Aufstellung aufnehmen oder entfernen
   const spielerUmschalten = (spielerId) => {
     if (!kannBearbeiten) return
 
     if (aufstellungSpielerIds.includes(spielerId)) {
-      // Entfernen
       setAufstellungSpielerIds(prev => prev.filter(id => id !== spielerId))
     } else {
-      // Hinzufügen (Max. 6 Spieler)
       if (aufstellungSpielerIds.length >= 6) {
-        setMeldung('⚠️ Die Aufstellung hat bereits 6 Spieler.')
+        setMeldung('⚠️ Maximum von 6 Spielern erreicht.')
         return
       }
       setAufstellungSpielerIds(prev => [...prev, spielerId])
@@ -143,7 +199,34 @@ function SpielDetail({ session }) {
     }
   }
 
-  // Verschieben per Buttons (Up/Down)
+  // Ersatzspieler anfragen
+  const ersatzAnfragenAbsenden = async () => {
+    if (!ausgewaehlterErsatz) return
+    setSpeichert(true)
+    
+    try {
+      const { error } = await supabase
+        .from('ersatz_anfragen')
+        .insert({
+          spiel_id: spielId,
+          benutzer_id: ausgewaehlterErsatz,
+          status: 'angefragt'
+        })
+
+      if (error) throw error
+
+      setMeldung('✅ Ersatzspieler-Anfrage gesendet!')
+      setAusgewaehlterErsatz('')
+      ladeDaten()
+    } catch (err) {
+      console.error(err)
+      setMeldung('❌ Fehler beim Anfragen: ' + err.message)
+    } finally {
+      setSpeichert(false)
+    }
+  }
+
+  // Aufstellung Position verschieben (Mobil-Tasten)
   const positionVerschieben = (index, richtung) => {
     const zielIndex = index + richtung
     if (zielIndex < 0 || zielIndex >= aufstellungSpielerIds.length) return
@@ -156,14 +239,8 @@ function SpielDetail({ session }) {
   }
 
   // Drag & Drop Handler
-  const handleDragStart = (index) => {
-    setDraggedIndex(index)
-  }
-
-  const handleDragOver = (e) => {
-    e.preventDefault()
-  }
-
+  const handleDragStart = (index) => setDraggedIndex(index)
+  const handleDragOver = (e) => e.preventDefault()
   const handleDrop = (targetIndex) => {
     if (draggedIndex === null || draggedIndex === targetIndex) return
     const neu = [...aufstellungSpielerIds]
@@ -173,7 +250,7 @@ function SpielDetail({ session }) {
     setDraggedIndex(null)
   }
 
-  // Speichern in Supabase
+  // Aufstellung Speichern
   const aufstellungSpeichern = async (veroeffentlichen = false) => {
     setSpeichert(true)
     setMeldung(null)
@@ -197,7 +274,6 @@ function SpielDetail({ session }) {
           .eq('id', aufstellungId)
       }
 
-      // Zuordnungen löschen und neu schreiben
       await supabase.from('aufstellung_spieler').delete().eq('aufstellung_id', aufstellungId)
 
       const eintraege = aufstellungSpielerIds.map((bId, idx) => ({
@@ -212,11 +288,11 @@ function SpielDetail({ session }) {
       }
 
       setIstVeroeffentlicht(veroeffentlichen)
-      setMeldung(veroeffentlichen ? '✅ Aufstellung veröffentlicht!' : '💾 Aufstellung als Entwurf gespeichert!')
+      setMeldung(veroeffentlichen ? '✅ Aufstellung veröffentlicht!' : '💾 Als Entwurf gespeichert!')
       ladeDaten()
     } catch (err) {
       console.error(err)
-      setMeldung('❌ Fehler beim Speichern: ' + err.message)
+      setMeldung('❌ Fehler: ' + err.message)
     } finally {
       setSpeichert(false)
     }
@@ -224,59 +300,51 @@ function SpielDetail({ session }) {
 
   if (ladend) {
     return (
-      <div style={{ minHeight: '100vh', background: '#F6FAF8', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        Lade Spiel-Details...
-      </div>
-    )
-  }
-
-  if (!spiel) {
-    return (
-      <div style={{ padding: 20 }}>
-        <p>Spiel nicht gefunden.</p>
-        <button style={buttonStyle} onClick={() => navigate('/spiele')}>Zurück zur Übersicht</button>
+      <div style={{ minHeight: '100vh', background: '#F6FAF8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'sans-serif' }}>
+        Lade Details...
       </div>
     )
   }
 
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
-      <div style={{ padding: '18px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+      
+      {/* Header */}
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid #DCE7E2', background: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', sticky: 'top' }}>
         <Brand size={16} />
-        <button onClick={() => navigate('/spiele')} style={{ ...secondaryButtonStyle, padding: '5px 10px', fontSize: 13 }}>
+        <button onClick={() => navigate('/spiele')} style={{ ...secondaryButtonStyle, padding: '6px 12px', fontSize: 13, minHeight: 'auto', width: 'auto' }}>
           ← Zurück
         </button>
       </div>
 
-      <div style={{ padding: '20px 20px 80px', maxWidth: 480, margin: '0 auto' }}>
+      <div style={{ padding: '16px 16px 80px', maxWidth: 480, margin: '0 auto' }}>
         
-        {/* Spiel Header */}
+        {/* Spiel-Details Header */}
         <div style={cardStyle}>
-          <div style={{ fontSize: 12, fontWeight: 700, color: '#1C8A4E', textTransform: 'uppercase', marginBottom: 4 }}>
-            {spiel.mannschaften?.name}
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#1C8A4E', textTransform: 'uppercase', marginBottom: 2 }}>
+            {spiel?.mannschaften?.name}
           </div>
-          <h1 style={{ fontFamily: 'Sora, sans-serif', fontSize: 18, fontWeight: 700, margin: '0 0 8px' }}>
-            {spiel.heim_oder_auswaerts === 'heim' ? `${spiel.mannschaften?.name} vs. ${spiel.gegner}` : `${spiel.gegner} vs. ${spiel.mannschaften?.name}`}
+          <h1 style={{ fontFamily: 'Sora, sans-serif', fontSize: 18, fontWeight: 700, margin: '0 0 6px' }}>
+            {spiel?.heim_oder_auswaerts === 'heim' ? `${spiel?.mannschaften?.name} vs. ${spiel?.gegner}` : `${spiel?.gegner} vs. ${spiel?.mannschaften?.name}`}
           </h1>
-          <div style={{ fontSize: 13.5, color: '#5B6D66', display: 'flex', flexDirection: 'column', gap: 3 }}>
-            <div>📅 {spiel.datum} {spiel.uhrzeit ? `· ⏰ ${spiel.uhrzeit.slice(0, 5)} Uhr` : ''}</div>
-            {spiel.halle && <div>📍 {spiel.halle}</div>}
-            <div>🏠 {spiel.heim_oder_auswaerts === 'heim' ? 'Heimspiel' : 'Auswärtsspiel'}</div>
+          <div style={{ fontSize: 13, color: '#5B6D66', display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <div>📅 {spiel?.datum} {spiel?.uhrzeit ? `· ⏰ ${spiel?.uhrzeit.slice(0, 5)} Uhr` : ''}</div>
+            {spiel?.halle && <div>📍 {spiel?.halle}</div>}
           </div>
         </div>
 
-        {/* Verfügbare Spieler / Zusagen */}
+        {/* Status / Zusagen Übersicht */}
         <div style={cardStyle}>
-          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4, display: 'flex', justifyContent: 'space-between' }}>
-            <span>✅ Zusagen ({zusagen.length})</span>
-            {kannBearbeiten && <span style={{ fontSize: 12, color: '#1C8A4E', fontWeight: 600 }}>Tippen zum Auswählen</span>}
+          <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
+            <span>✅ Verfügbare Spieler ({alleZusagen.length})</span>
+            {kannBearbeiten && <span style={{ fontSize: 11, color: '#1C8A4E', fontWeight: 600 }}>Tippen zum Wählen</span>}
           </div>
 
-          {zusagen.length === 0 ? (
-            <p style={{ fontSize: 13, color: '#5B6D66', margin: 0 }}>Noch keine Zusagen vorhanden.</p>
-          ) : (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 8 }}>
-              {zusagen.map(z => {
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+            {alleZusagen.length === 0 ? (
+              <p style={{ fontSize: 13, color: '#5B6D66', margin: 0 }}>Noch keine Zusagen vorhanden.</p>
+            ) : (
+              alleZusagen.map(z => {
                 const imTeam = aufstellungSpielerIds.includes(z.id)
                 const posInTeam = aufstellungSpielerIds.indexOf(z.id) + 1
 
@@ -289,34 +357,90 @@ function SpielDetail({ session }) {
                       justify: 'space-between',
                       alignItems: 'center',
                       fontSize: 13,
-                      padding: '8px 12px',
+                      padding: '10px 12px',
                       background: imTeam ? '#E6F4EA' : '#F0F7F4',
                       border: imTeam ? '1.5px solid #1C8A4E' : '1px solid #DCE7E2',
-                      borderRadius: 8,
-                      cursor: kannBearbeiten ? 'pointer' : 'default',
-                      transition: 'all 0.15s ease'
+                      borderRadius: 10,
+                      cursor: kannBearbeiten ? 'pointer' : 'default'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <span style={{ fontWeight: 600 }}>{z.vorname} {z.nachname}</span>
-                      {z.qttr && <span style={{ fontSize: 11.5, color: '#5B6D66' }}>({z.qttr} QTTR)</span>}
+                      {z.status === 'zugesagt' && z.anfrageId && <span style={{ fontSize: 10, background: '#E3F2FD', color: '#1976D2', padding: '2px 5px', borderRadius: 4 }}>Ersatz</span>}
+                      {z.qttr && <span style={{ fontSize: 11, color: '#5B6D66' }}>({z.qttr})</span>}
                     </div>
 
                     {imTeam ? (
-                      <span style={{ background: '#1C8A4E', color: 'white', fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 10 }}>
+                      <span style={{ background: '#1C8A4E', color: 'white', fontSize: 11, fontWeight: 700, padding: '3px 8px', borderRadius: 12 }}>
                         Pos {posInTeam} ✓
                       </span>
                     ) : (
-                      <span style={{ fontSize: 12, color: '#1C8A4E', fontWeight: 600 }}>+ Hinzufügen</span>
+                      <span style={{ fontSize: 12, color: '#1C8A4E', fontWeight: 600 }}>+ Aufnehmen</span>
                     )}
                   </div>
                 )
-              })}
-            </div>
-          )}
+              })
+            )}
+          </div>
         </div>
 
-        {/* Aktuelle Aufstellung (Drag & Drop + Pfeil-Steuerung) */}
+        {/* ERSATZSPIELER ANFRAGEN (Mobil Optimiert) */}
+        {kannBearbeiten && (
+          <div style={cardStyle}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+              🔄 Ersatzspieler anfragen
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <select
+                style={selectStyle}
+                value={ausgewaehlterErsatz}
+                onChange={e => setAusgewaehlterErsatz(e.target.value)}
+              >
+                <option value="">-- Spieler auswählen --</option>
+                {alleBenutzer
+                  .filter(b => !verfuegbarkeiten.some(v => v.id === b.id))
+                  .map(b => (
+                    <option key={b.id} value={b.id}>
+                      {b.vorname} {b.nachname} {b.qttr ? `(${b.qttr} QTTR)` : ''}
+                    </option>
+                  ))}
+              </select>
+
+              <button
+                onClick={ersatzAnfragenAbsenden}
+                disabled={!ausgewaehlterErsatz || speichert}
+                style={{ ...secondaryButtonStyle, opacity: !ausgewaehlterErsatz ? 0.5 : 1 }}
+              >
+                📩 Ersatz-Anfrage senden
+              </button>
+            </div>
+
+            {/* Liste bereits angefragter Ersatzspieler */}
+            {ersatzAnfragen.length > 0 && (
+              <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #DCE7E2' }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: '#5B6D66', marginBottom: 6 }}>
+                  Angefragte Ersatzspieler:
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                  {ersatzAnfragen.map(e => (
+                    <div key={e.anfrageId} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span>{e.vorname} {e.nachname}</span>
+                      <span style={{ 
+                        fontWeight: 600, 
+                        color: e.status === 'zugesagt' ? '#1C8A4E' : e.status === 'abgesagt' ? '#c0392b' : '#d35400' 
+                      }}>
+                        {e.status === 'zugesagt' ? '✅ Zugesagt' : e.status === 'abgesagt' ? '❌ Abgesagt' : '⏳ Ausstehend'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* AUFSTELLUNG (Mobil-First Reordering) */}
         <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h2 style={{ fontFamily: 'Sora, sans-serif', fontSize: 16, fontWeight: 700, margin: 0 }}>
@@ -341,12 +465,12 @@ function SpielDetail({ session }) {
 
           {aufstellungSpielerIds.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '16px 0', color: '#5B6D66', fontSize: 13, border: '1px dashed #DCE7E2', borderRadius: 8 }}>
-              Klicke oben auf die Zusagen, um Spieler in die Aufstellung aufzunehmen.
+              Wähle oben verfügbare Spieler oder Ersatzspieler aus.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {aufstellungSpielerIds.map((bId, idx) => {
-                const s = verfuegbarkeiten.find(v => v.id === bId)
+                const s = alleBenutzer.find(b => b.id === bId)
 
                 return (
                   <div
@@ -358,17 +482,16 @@ function SpielDetail({ session }) {
                     style={{
                       display: 'flex',
                       alignItems: 'center',
-                      justifyContent: 'space-between',
+                      justify: 'space-between',
                       padding: '10px 12px',
                       background: '#ffffff',
                       border: '1px solid #DCE7E2',
-                      borderRadius: 8,
-                      boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
-                      cursor: kannBearbeiten ? 'grab' : 'default'
+                      borderRadius: 10,
+                      boxShadow: '0 1px 3px rgba(0,0,0,0.03)'
                     }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <span style={{ fontWeight: 800, fontSize: 13, color: '#1C8A4E', width: 22 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{ fontWeight: 800, fontSize: 14, color: '#1C8A4E', width: 20 }}>
                         {idx + 1}.
                       </span>
                       <div>
@@ -381,26 +504,23 @@ function SpielDetail({ session }) {
 
                     {kannBearbeiten && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-                        {/* Reihenfolge ändern Buttons */}
                         <button
                           onClick={() => positionVerschieben(idx, -1)}
                           disabled={idx === 0}
-                          style={{ border: 'none', background: '#F0F7F4', borderRadius: 4, padding: '4px 7px', cursor: 'pointer', opacity: idx === 0 ? 0.3 : 1 }}
+                          style={{ border: 'none', background: '#F0F7F4', borderRadius: 6, width: 34, height: 34, cursor: 'pointer', opacity: idx === 0 ? 0.3 : 1 }}
                         >
                           ⬆️
                         </button>
                         <button
                           onClick={() => positionVerschieben(idx, 1)}
                           disabled={idx === aufstellungSpielerIds.length - 1}
-                          style={{ border: 'none', background: '#F0F7F4', borderRadius: 4, padding: '4px 7px', cursor: 'pointer', opacity: idx === aufstellungSpielerIds.length - 1 ? 0.3 : 1 }}
+                          style={{ border: 'none', background: '#F0F7F4', borderRadius: 6, width: 34, height: 34, cursor: 'pointer', opacity: idx === aufstellungSpielerIds.length - 1 ? 0.3 : 1 }}
                         >
                           ⬇️
                         </button>
-
-                        {/* Entfernen Button */}
                         <button
                           onClick={() => spielerUmschalten(bId)}
-                          style={{ border: 'none', background: '#FDF2F2', color: '#c0392b', borderRadius: 4, padding: '4px 7px', cursor: 'pointer', marginLeft: 4 }}
+                          style={{ border: 'none', background: '#FDF2F2', color: '#c0392b', borderRadius: 6, width: 34, height: 34, cursor: 'pointer', marginLeft: 2 }}
                         >
                           ✕
                         </button>
@@ -418,7 +538,7 @@ function SpielDetail({ session }) {
               <button
                 onClick={() => aufstellungSpeichern(true)}
                 disabled={speichert || aufstellungSpielerIds.length === 0}
-                style={{ ...buttonStyle, opacity: aufstellungSpielerIds.length === 0 ? 0.5 : 1 }}
+                style={{ ...primaryButtonStyle, opacity: aufstellungSpielerIds.length === 0 ? 0.5 : 1 }}
               >
                 🚀 Aufstellung veröffentlichen
               </button>
@@ -441,4 +561,3 @@ function SpielDetail({ session }) {
 }
 
 export default SpielDetail
- 
