@@ -1,6 +1,6 @@
 import { Link, useLocation } from 'react-router-dom'
 
-function BottomNav({ istAdmin }) {
+export function BottomNav({ istAdmin }) {
   const location = useLocation()
   const path = location.pathname
 
