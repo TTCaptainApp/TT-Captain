@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
+import BottomNav from './BottomNav'
 
 function Chat({ session }) {
   const { chatId } = useParams()
@@ -11,6 +12,7 @@ function Chat({ session }) {
   const [neueNachricht, setNeueNachricht] = useState('')
   const [titel, setTitel] = useState('Chat')
   const [hatZugriff, setHatZugriff] = useState(false)
+  const [istAdmin, setIstAdmin] = useState(false)
   const [ladend, setLadend] = useState(true)
   const [speichert, setSpeichert] = useState(false)
   const messagesEndRef = useRef(null)
@@ -38,8 +40,9 @@ function Chat({ session }) {
           .eq('id', session.user.id)
           .single()
         
-        const istAdmin = adminData?.ist_administrator || false
-        if (istAdmin) zugriffErlaubt = true
+        const adminStatus = adminData?.ist_administrator || false
+        setIstAdmin(adminStatus)
+        if (adminStatus) zugriffErlaubt = true
 
         if (istTeamChat) {
           const { data: mData } = await supabase
@@ -184,14 +187,14 @@ function Chat({ session }) {
           </button>
           <div style={{ overflow: 'hidden' }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: '#1C8A4E', textTransform: 'uppercase', letterSpacing: '.04em' }}>Chat</div>
-            <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 14, fontWeight: 700, color: '#16261F', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 260 }}>{titel}</div>
+            <div style={{ fontFamily: 'Sora, sans-serif', fontSize: 14, fontWeight: 700, color: '#16261F', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240 }}>{titel}</div>
           </div>
         </div>
         <Brand size={14} />
       </div>
 
-      {/* Scrollbarer Nachrichtenbereich (zwischen Header und Footer) */}
-      <div style={{ flex: 1, width: '100%', maxWidth: 480, margin: '0 auto', overflowY: 'auto', padding: '75px 16px 80px 16px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
+      {/* Scrollbarer Nachrichtenbereich (eingepasst zwischen Header und Eingabezeile) */}
+      <div style={{ position: 'absolute', top: 60, bottom: 128, left: 0, right: 0, width: '100%', maxWidth: 480, margin: '0 auto', overflowY: 'auto', padding: '16px', boxSizing: 'border-box', display: 'flex', flexDirection: 'column' }}>
         {!hatZugriff ? (
           <div style={{ background: '#FDF2F2', border: '1px solid #F5C6CB', borderRadius: 12, color: '#C0392B', textAlign: 'center', padding: 20, marginTop: 20 }}>
             🚫 Du hast keinen Zugriff auf diesen Chat oder die Aufstellung ist noch nicht veröffentlicht.
@@ -240,9 +243,9 @@ function Chat({ session }) {
         )}
       </div>
 
-      {/* Fixiertes Eingabefeld unten */}
+      {/* WhatsApp-Eingabefeld (fixiert direkt über der unteren Navigation) */}
       {hatZugriff && (
-        <form onSubmit={nachrichtSenden} style={{ position: 'fixed', bottom: 0, left: 0, right: 0, height: 64, background: '#f0f2f5', borderTop: '1px solid #DCE7E2', padding: '8px 12px', display: 'flex', gap: 8, alignItems: 'center', maxWidth: 480, margin: '0 auto', zIndex: 1000, boxSizing: 'border-box' }}>
+        <form onSubmit={nachrichtSenden} style={{ position: 'fixed', bottom: 64, left: 0, right: 0, height: 64, background: '#f0f2f5', borderTop: '1px solid #DCE7E2', padding: '8px 12px', display: 'flex', gap: 8, alignItems: 'center', maxWidth: 480, margin: '0 auto', zIndex: 1000, boxSizing: 'border-box' }}>
           <input
             type="text"
             placeholder="Nachricht"
@@ -262,9 +265,11 @@ function Chat({ session }) {
         </form>
       )}
 
+      {/* Fixierte untere Navigation */}
+      <BottomNav istAdmin={istAdmin} />
+
     </div>
   )
 }
 
 export default Chat
- 
