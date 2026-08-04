@@ -162,7 +162,8 @@ function Chat({ session }) {
       const payload = {
         text: neueNachricht,
         benutzer_id: session.user.id,
-        chat_id: echteId
+        chat_id: echteId,
+        gesendet_am: new Date().toISOString()
       }
 
       const { error } = await supabase
@@ -183,6 +184,7 @@ function Chat({ session }) {
       setTimeout(scrollToBottom, 100)
     } catch (err) {
       console.error('Fehler beim Senden:', err)
+      alert('Fehler beim Senden: ' + (err.message || JSON.stringify(err)))
     } finally {
       setSpeichert(false)
     }
