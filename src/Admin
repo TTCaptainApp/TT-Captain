@@ -203,6 +203,7 @@ function Admin({ session }) {
               <label style={{ fontSize: 12, fontWeight: 700, color: '#5B6D66', display: 'block', marginBottom: 4 }}>Rolle in der Mannschaft</label>
               <select style={inputStyle} value={selRolle} onChange={e => setSelRolle(e.target.value)}>
                 <option value="spieler">🏓 Spieler</option>
+                <option value="stellvertreter">🎗️ Stellv. Spielführer</option>
                 <option value="spielfuehrer">📋 Spielführer</option>
               </select>
             </div>
@@ -239,6 +240,7 @@ function Admin({ session }) {
                         onChange={e => rolleAendern(z.id, e.target.value)}
                       >
                         <option value="spieler">🏓 Spieler</option>
+                        <option value="stellvertreter">🎗️ Stellv. Spielführer</option>
                         <option value="spielfuehrer">📋 Spielführer</option>
                       </select>
                     </div>
@@ -284,3 +286,4 @@ function Admin({ session }) {
 }
 
 export default Admin
+ 
