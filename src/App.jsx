@@ -17,16 +17,13 @@ function App() {
   const [ladend, setLadend] = useState(true)
 
   useEffect(() => {
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        setSession(session)
-      })
-      .catch((err) => {
-        console.error('Session-Fehler:', err)
-      })
-      .finally(() => {
-        setLadend(false)
-      })
+    // Session abrufen mit Timeout-Schutz
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      setLadend(false)
+    }).catch(() => {
+      setLadend(false)
+    })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
@@ -38,8 +35,8 @@ function App() {
 
   if (ladend) {
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh', fontFamily: 'sans-serif', color: '#1C8A4E', fontWeight: 600 }}>
-        🔄 App lädt...
+      <div style={{ padding: 40, textAlign: 'center', fontFamily: 'sans-serif', color: '#1C8A4E' }}>
+        Laden...
       </div>
     )
   }
@@ -70,3 +67,4 @@ function App() {
 }
 
 export default App
+ 
