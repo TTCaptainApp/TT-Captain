@@ -55,7 +55,9 @@ function SpielDetail({ session }) {
   const [spiel, setSpiel] = useState(null)
   const [verfuegbarkeiten, setVerfuegbarkeiten] = useState([])
   const [ersatzAnfragen, setErsatzAnfragen] = useState([])
-  const [alleBenutzer, setAlleBenutzer] = useState([])
+  
+  // Gefilterte Ersatzspieler (tieferes Team + am Spieltag noch frei)
+  const [moeglicheErsatzspieler, setMoeglicheErsatzspieler] = useState([])
   const [ausgewaehlterErsatz, setAusgewaehlterErsatz] = useState('')
 
   const [aufstellung, setAufstellung] = useState(null)
@@ -75,7 +77,7 @@ function SpielDetail({ session }) {
     // 1. Spiel-Informationen
     const { data: spielData, error: spielError } = await supabase
       .from('spiele')
-      .select('*, mannschaften(name)')
+      .select('*, mannschaften(id, name, reihenfolge)')
       .eq('id', spielId)
       .single()
 
@@ -86,7 +88,10 @@ function SpielDetail({ session }) {
     }
     setSpiel(spielData)
 
-    // 2. Rechte-Check
+    const aktuelleReihenfolge = spielData.mannschaften?.reihenfolge || 1
+    const spielDatum = spielData.datum
+
+    // 2. Rechte prüfen
     const { data: adminData } = await supabase
       .from('benutzer')
       .select('ist_administrator')
@@ -106,7 +111,7 @@ function SpielDetail({ session }) {
       setIstSpielfuehrer(true)
     }
 
-    // 3. Stammspieler Verfügbarkeiten
+    // 3. Stammspieler Verfügbarkeiten für dieses Spiel
     const { data: verfData } = await supabase
       .from('verfuegbarkeiten')
       .select(`
@@ -121,7 +126,7 @@ function SpielDetail({ session }) {
     }))
     setVerfuegbarkeiten(aufbereitet)
 
-    // 4. Ersatzspieler-Anfragen laden
+    // 4. Ersatzspieler-Anfragen für dieses Spiel
     const { data: ersatzData } = await supabase
       .from('ersatz_anfragen')
       .select(`
@@ -138,15 +143,69 @@ function SpielDetail({ session }) {
     }))
     setErsatzAnfragen(aufbereiteteErsatz)
 
-    // 5. Alle Benutzer laden für Ersatzspieler-Dropdown
-    const { data: benutzerData } = await supabase
-      .from('benutzer')
-      .select('id, vorname, nachname, qttr')
-      .order('nachname', { ascending: true })
+    // 5. PRÜFUNG SPIELTAG: Alle anderen Spiele am gleichen Datum finden
+    const { data: spieleAmGleichenTag } = await supabase
+      .from('spiele')
+      .select('id')
+      .eq('datum', spielDatum)
+      .neq('id', spielId)
 
-    setAlleBenutzer(benutzerData || [])
+    const spielIdsGleicherTag = (spieleAmGleichenTag || []).map(s => s.id)
 
-    // 6. Bisherige Aufstellung
+    let blockierteSpielerIds = new Set()
+
+    if (spielIdsGleicherTag.length > 0) {
+      // Stammspieler-Zusagen an diesem Tag
+      const { data: verfGleicherTag } = await supabase
+        .from('verfuegbarkeiten')
+        .select('benutzer_id')
+        .in('spiel_id', spielIdsGleicherTag)
+        .eq('status', 'zugesagt')
+
+      // Ersatzspieler-Zusagen an diesem Tag
+      const { data: ersatzGleicherTag } = await supabase
+        .from('ersatz_anfragen')
+        .select('benutzer_id')
+        .in('spiel_id', spielIdsGleicherTag)
+        .eq('status', 'zugesagt')
+
+      ;(verfGleicherTag || []).forEach(v => blockierteSpielerIds.add(v.benutzer_id))
+      ;(ersatzGleicherTag || []).forEach(e => blockierteSpielerIds.add(e.benutzer_id))
+    }
+
+    // 6. Ersatzspieler filtern: Nur aus TIEFEREN Teams UND frei am Spieltag
+    const { data: alleZuordnungen } = await supabase
+      .from('mannschaftszuordnungen')
+      .select(`
+        benutzer_id,
+        mannschaften ( id, name, reihenfolge ),
+        benutzer ( id, vorname, nachname, qttr )
+      `)
+
+    if (alleZuordnungen) {
+      const gefiltert = alleZuordnungen
+        .filter(z => {
+          const teamReihenfolge = z.mannschaften?.reihenfolge || 99
+          const istTieferesTeam = teamReihenfolge > aktuelleReihenfolge
+          const bId = z.benutzer_id || (Array.isArray(z.benutzer) ? z.benutzer[0]?.id : z.benutzer?.id)
+          
+          // Nicht bereits an diesem Tag in anderem Spiel zugesagt
+          const istFreiAmSpieltag = !blockierteSpielerIds.has(bId)
+
+          return istTieferesTeam && istFreiAmSpieltag
+        })
+        .map(z => ({
+          ... (Array.isArray(z.benutzer) ? z.benutzer[0] : z.benutzer),
+          mannschaftsName: z.mannschaften?.name || 'Tieferes Team'
+        }))
+        // Duplikate entfernen & nach QTTR sortieren
+        .filter((v, i, a) => a.findIndex(t => t.id === v.id) === i)
+        .sort((a, b) => (b.qttr || 0) - (a.qttr || 0))
+
+      setMoeglicheErsatzspieler(gefiltert)
+    }
+
+    // 7. Bisherige Aufstellung
     const { data: aufstellungsData } = await supabase
       .from('aufstellungen')
       .select(`
@@ -226,7 +285,7 @@ function SpielDetail({ session }) {
     }
   }
 
-  // Aufstellung Position verschieben (Mobil-Tasten)
+  // Position verschieben (Mobil-Tasten)
   const positionVerschieben = (index, richtung) => {
     const zielIndex = index + richtung
     if (zielIndex < 0 || zielIndex >= aufstellungSpielerIds.length) return
@@ -310,7 +369,7 @@ function SpielDetail({ session }) {
     <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
       
       {/* Header */}
-      <div style={{ padding: '14px 16px', borderBottom: '1px solid #DCE7E2', background: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center', sticky: 'top' }}>
+      <div style={{ padding: '14px 16px', borderBottom: '1px solid #DCE7E2', background: '#ffffff', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Brand size={16} />
         <button onClick={() => navigate('/spiele')} style={{ ...secondaryButtonStyle, padding: '6px 12px', fontSize: 13, minHeight: 'auto', width: 'auto' }}>
           ← Zurück
@@ -319,7 +378,7 @@ function SpielDetail({ session }) {
 
       <div style={{ padding: '16px 16px 80px', maxWidth: 480, margin: '0 auto' }}>
         
-        {/* Spiel-Details Header */}
+        {/* Spiel Header */}
         <div style={cardStyle}>
           <div style={{ fontSize: 11, fontWeight: 700, color: '#1C8A4E', textTransform: 'uppercase', marginBottom: 2 }}>
             {spiel?.mannschaften?.name}
@@ -333,7 +392,7 @@ function SpielDetail({ session }) {
           </div>
         </div>
 
-        {/* Status / Zusagen Übersicht */}
+        {/* Zusagen Übersicht */}
         <div style={cardStyle}>
           <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
             <span>✅ Verfügbare Spieler ({alleZusagen.length})</span>
@@ -384,11 +443,14 @@ function SpielDetail({ session }) {
           </div>
         </div>
 
-        {/* ERSATZSPIELER ANFRAGEN (Mobil Optimiert) */}
+        {/* ERSATZSPIELER ANFRAGEN (Nur aus tieferen Teams & frei am Spieltag) */}
         {kannBearbeiten && (
           <div style={cardStyle}>
-            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 8 }}>
+            <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 4 }}>
               🔄 Ersatzspieler anfragen
+            </div>
+            <div style={{ fontSize: 12, color: '#5B6D66', marginBottom: 10 }}>
+              Zeigt nur verfügbare Spieler aus tieferen Teams ohne Spielüberschneidung an.
             </div>
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -397,14 +459,12 @@ function SpielDetail({ session }) {
                 value={ausgewaehlterErsatz}
                 onChange={e => setAusgewaehlterErsatz(e.target.value)}
               >
-                <option value="">-- Spieler auswählen --</option>
-                {alleBenutzer
-                  .filter(b => !verfuegbarkeiten.some(v => v.id === b.id))
-                  .map(b => (
-                    <option key={b.id} value={b.id}>
-                      {b.vorname} {b.nachname} {b.qttr ? `(${b.qttr} QTTR)` : ''}
-                    </option>
-                  ))}
+                <option value="">-- Ersatzspieler wählen --</option>
+                {moeglicheErsatzspieler.map(b => (
+                  <option key={b.id} value={b.id}>
+                    {b.vorname} {b.nachname} ({b.mannschaftsName} · {b.qttr ? `${b.qttr} QTTR` : 'Kein QTTR'})
+                  </option>
+                ))}
               </select>
 
               <button
@@ -416,7 +476,7 @@ function SpielDetail({ session }) {
               </button>
             </div>
 
-            {/* Liste bereits angefragter Ersatzspieler */}
+            {/* Bisher angefragte Ersatzspieler */}
             {ersatzAnfragen.length > 0 && (
               <div style={{ marginTop: 12, paddingTop: 10, borderTop: '1px solid #DCE7E2' }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#5B6D66', marginBottom: 6 }}>
@@ -440,7 +500,7 @@ function SpielDetail({ session }) {
           </div>
         )}
 
-        {/* AUFSTELLUNG (Mobil-First Reordering) */}
+        {/* AUFSTELLUNG */}
         <div style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <h2 style={{ fontFamily: 'Sora, sans-serif', fontSize: 16, fontWeight: 700, margin: 0 }}>
@@ -465,12 +525,12 @@ function SpielDetail({ session }) {
 
           {aufstellungSpielerIds.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '16px 0', color: '#5B6D66', fontSize: 13, border: '1px dashed #DCE7E2', borderRadius: 8 }}>
-              Wähle oben verfügbare Spieler oder Ersatzspieler aus.
+              Wähle oben verfügbare Spieler aus.
             </div>
           ) : (
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {aufstellungSpielerIds.map((bId, idx) => {
-                const s = alleBenutzer.find(b => b.id === bId)
+                const s = [...verfuegbarkeiten, ...moeglicheErsatzspieler].find(b => b.id === bId)
 
                 return (
                   <div
@@ -561,3 +621,4 @@ function SpielDetail({ session }) {
 }
 
 export default SpielDetail
+ 
