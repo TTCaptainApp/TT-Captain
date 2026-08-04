@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Registrierung from './Registrierung'
 import Login from './Login'
@@ -38,19 +38,12 @@ function App() {
   }
 
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<Dashboard session={session} />} />
-        <Route path="/mannschaften" element={<Mannschaften session={session} />} />
-        <Route path="/spiele" element={<Spiele session={session} />} />
-        <Route path="/spiele/:spielId/aufstellung" element={<Aufstellung session={session} />} />
-        <Route path="/chats" element={<Chats session={session} />} />
-        <Route path="/chats/mannschaft/:mannschaftId" element={<Chat session={session} />} />
-        <Route path="/chats/spiel/:spielId" element={<Chat session={session} />} />
-        <Route path="*" element={<Navigate to="/" />} />
-      </Routes>
-    </BrowserRouter>
-  )
-}
-
-export default App 
+    <Routes>
+      <Route path="/" element={<Dashboard session={session} />} />
+      <Route path="/mannschaften" element={<Mannschaften session={session} />} />
+      <Route path="/spiele" element={<Spiele session={session} />} />
+      <Route path="/spiele/:spielId/aufstellung" element={<Aufstellung session={session} />} />
+      <Route path="/chats" element={<Chats session={session} />} />
+      <Route path="/chats/mannschaft/:mannschaftId" element={<Chat session={session} />} />
+      <Route path="/chats/spiel/:spielId" element={<Chat session={session} />} />
+      <Route path="*" element={<Navigate to="/" />} />
