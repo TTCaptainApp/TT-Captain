@@ -47,3 +47,8 @@ function App() {
       <Route path="/chats/mannschaft/:mannschaftId" element={<Chat session={session} />} />
       <Route path="/chats/spiel/:spielId" element={<Chat session={session} />} />
       <Route path="*" element={<Navigate to="/" />} />
+    </Routes>
+  )
+}
+
+export default App 
