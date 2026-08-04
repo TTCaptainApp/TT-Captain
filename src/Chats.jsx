@@ -18,7 +18,7 @@ function Chats({ session }) {
       const { data: benutzerRow } = await supabase.from('benutzer').select('ist_administrator').eq('id', session.user.id).single()
       setIstAdmin(benutzerRow?.ist_administrator || false)
 
-      // 2. Teamchats laden (alle Teams, in denen der Spieler Mitglied ist)
+      // 2. Teamchats laden
       const { data: zuordnungen } = await supabase
         .from('mannschaftszuordnungen')
         .select('mannschaft_id, mannschaften(name)')
@@ -26,24 +26,25 @@ function Chats({ session }) {
       const teams = (zuordnungen || []).map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
       setTeamChats(teams)
 
-      // 3. Spielchats laden: Nur veröffentlichte Aufstellungen, in denen der User steht
+      // 3. Spielchats über aufstellung_spieler + aufstellungen laden
       const heute = new Date().toISOString().slice(0, 10)
 
-      const { data: meinteAufstellungen } = await supabase
-        .from('aufstellungen')
-        .select('spiel_id, spiele!inner(id, gegner, heim_oder_auswaerts, datum, aufstellung_veroeffentlicht, mannschaften(name))')
+      const { data: eintraege } = await supabase
+        .from('aufstellung_spieler')
+        .select('aufstellungen!inner(spiel_id, veroeffentlicht, spiele!inner(id, gegner, heim_oder_auswaerts, datum, mannschaften(name)))')
         .eq('benutzer_id', session.user.id)
-        .eq('spiele.aufstellung_veroeffentlicht', true)
-        .gte('spiele.datum', heute)
+        .eq('aufstellungen.veroeffentlicht', true)
+        .gte('aufstellungen.spiele.datum', heute)
 
-      const gefilterteSpiele = (meinteAufstellungen || [])
-        .map(a => a.spiele)
+      const gefilterteSpiele = (eintraege || [])
+        .map(e => e.aufstellungen?.spiele)
         .filter(Boolean)
 
-      // Nach Spieldatum sortieren
-      gefilterteSpiele.sort((a, b) => new Date(a.datum) - new Date(b.datum))
+      // Eindeutige Spiele herausfiltern
+      const mehraufhebung = Array.from(new Map(gefilterteSpiele.map(s => [s.id, s])).values())
+      mehraufhebung.sort((a, b) => new Date(a.datum) - new Date(b.datum))
 
-      setSpielChats(gefilterteSpiele)
+      setSpielChats(mehraufhebung)
       setLadend(false)
     }
     laden()
@@ -94,3 +95,4 @@ function Chats({ session }) {
 }
 
 export default Chats
+ 
