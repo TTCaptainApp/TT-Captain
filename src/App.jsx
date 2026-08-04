@@ -51,37 +51,40 @@ function App() {
     )
   }
 
-  // Nicht eingeloggt? Login-Maske anzeigen
-  if (!session) {
-    return <Login />
-  }
-
   return (
     <BrowserRouter>
       <Routes>
-        {/* Hauptübersichten */}
-        <Route path="/" element={<Dashboard session={session} />} />
-        <Route path="/spiele" element={<Spiele session={session} />} />
-        
-        {/* Spiel-Details & Aufstellung (deckt beide URL-Varianten ab) */}
-        <Route path="/spiele/:spielId" element={<SpielDetail session={session} />} />
-        <Route path="/spiele/:spielId/aufstellung" element={<SpielDetail session={session} />} />
-        
-        {/* Falls Aufstellung.jsx separat genutzt werden soll */}
-        <Route path="/aufstellung/:spielId" element={<Aufstellung session={session} />} />
+        {!session ? (
+          /* Routen für NICHT-eingeloggte Benutzer */
+          <>
+            <Route path="/registrierung" element={<Registrierung />} />
+            <Route path="*" element={<Login />} />
+          </>
+        ) : (
+          /* Routen für EINGELOGGTE Benutzer */
+          <>
+            <Route path="/" element={<Dashboard session={session} />} />
+            <Route path="/spiele" element={<Spiele session={session} />} />
+            
+            {/* Spiel-Details & Aufstellung */}
+            <Route path="/spiele/:spielId" element={<SpielDetail session={session} />} />
+            <Route path="/spiele/:spielId/aufstellung" element={<SpielDetail session={session} />} />
+            <Route path="/aufstellung/:spielId" element={<Aufstellung session={session} />} />
 
-        {/* Teams & Kommunikation */}
-        <Route path="/mannschaften" element={<Mannschaften session={session} />} />
-        <Route path="/chats" element={<Chats session={session} />} />
-        <Route path="/chat/:chatId" element={<Chat session={session} />} />
+            {/* Teams & Kommunikation */}
+            <Route path="/mannschaften" element={<Mannschaften session={session} />} />
+            <Route path="/chats" element={<Chats session={session} />} />
+            <Route path="/chat/:chatId" element={<Chat session={session} />} />
 
-        {/* Profil & Administration */}
-        <Route path="/profil" element={<Profil session={session} />} />
-        <Route path="/admin" element={<Admin session={session} />} />
-        <Route path="/registrierung" element={<Registrierung session={session} />} />
+            {/* Profil & Administration */}
+            <Route path="/profil" element={<Profil session={session} />} />
+            <Route path="/admin" element={<Admin session={session} />} />
+            <Route path="/registrierung" element={<Registrierung session={session} />} />
 
-        {/* Umleitung für unbekannte Pfade -> zurück zum Dashboard */}
-        <Route path="*" element={<Navigate to="/" replace />} />
+            {/* Fallback bei unbekannten URLs */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </>
+        )}
       </Routes>
     </BrowserRouter>
   )
