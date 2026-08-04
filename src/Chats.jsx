@@ -4,13 +4,7 @@ import { supabase } from './supabaseClient'
 import Brand from './Brand'
 import BottomNav from './BottomNav'
 
-const cardStyle = { 
-  background: '#ffffff', 
-  border: '1px solid #DCE7E2', 
-  borderRadius: 14, 
-  padding: 14, 
-  marginBottom: 10 
-}
+const cardStyle = { background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 14, marginBottom: 10 }
 
 function Chats({ session }) {
   const [istAdmin, setIstAdmin] = useState(false)
@@ -20,49 +14,41 @@ function Chats({ session }) {
 
   useEffect(() => {
     const laden = async () => {
-      const { data: benutzerRow } = await supabase
-        .from('benutzer')
-        .select('ist_administrator')
-        .eq('id', session.user.id)
-        .single()
-      
+      const { data: benutzerRow } = await supabase.from('benutzer').select('ist_administrator').eq('id', session.user.id).single()
       setIstAdmin(benutzerRow?.ist_administrator || false)
 
       const { data: zuordnungen } = await supabase
         .from('mannschaftszuordnungen')
         .select('mannschaft_id, mannschaften(name)')
         .eq('benutzer_id', session.user.id)
+      const teams = (zuordnungen || []).map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
+      setTeamChats(teams)
 
-      const rawTeams = (zuordnungen || [])
-        .map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
-        .filter(t => t.mannschaft_id && t.name)
-
-      const eindeutigeTeams = Array.from(
-        new Map(rawTeams.map(t => [t.mannschaft_id, t])).values()
-      )
-
-      setTeamChats(eindeutigeTeams)
-
+      const mannschaftIds = teams.map(t => t.mannschaft_id)
       const heute = new Date().toISOString().slice(0, 10)
 
-      const { data: eintraege } = await supabase
-        .from('aufstellung_spieler')
-        .select('aufstellungen!inner(spiel_id, veroeffentlicht, spiele!inner(id, gegner, heim_oder_auswaerts, datum, mannschaften(name)))')
-        .eq('benutzer_id', session.user.id)
-        .eq('aufstellungen.veroeffentlicht', true)
-        .gte('aufstellungen.spiele.datum', heute)
+      let eigeneSpiele = []
+      if (mannschaftIds.length > 0) {
+        const { data } = await supabase
+          .from('spiele')
+          .select('id, gegner, heim_oder_auswaerts, datum, mannschaften(name)')
+          .in('mannschaft_id', mannschaftIds)
+          .gte('datum', heute)
+          .order('datum')
+        eigeneSpiele = data || []
+      }
 
-      const gefilterteSpiele = (eintraege || [])
-        .map(e => e.aufstellungen?.spiele)
-        .filter(Boolean)
+      const { data: ersatzSpiele } = await supabase
+        .from('ersatzanfragen')
+        .select('spiel_id, spiele(id, gegner, heim_oder_auswaerts, datum, mannschaften(name))')
+        .eq('angefragter_benutzer_id', session.user.id)
+        .eq('status', 'zugesagt')
 
-      const mehraufhebung = Array.from(new Map(gefilterteSpiele.map(s => [s.id, s])).values())
-      mehraufhebung.sort((a, b) => new Date(a.datum) - new Date(b.datum))
-
-      setSpielChats(mehraufhebung)
+      const ersatzListe = (ersatzSpiele || []).filter(e => e.spiele).map(e => e.spiele)
+      const alleSpiele = [...eigeneSpiele, ...ersatzListe.filter(s => !eigeneSpiele.some(es => es.id === s.id))]
+      setSpielChats(alleSpiele)
       setLadend(false)
     }
-
     laden()
   }, [session])
 
@@ -81,7 +67,7 @@ function Chats({ session }) {
           Teamchats
         </div>
         {teamChats.map(t => (
-          <Link key={t.mannschaft_id} to={`/chat/team_${t.mannschaft_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Link key={t.mannschaft_id} to={`/chats/mannschaft/${t.mannschaft_id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
             <div style={cardStyle}>
               <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>💬 {t.name}</span>
             </div>
@@ -93,7 +79,7 @@ function Chats({ session }) {
           Spielchats
         </div>
         {spielChats.map(s => (
-          <Link key={s.id} to={`/chat/spiel_${s.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
+          <Link key={s.id} to={`/chats/spiel/${s.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
             <div style={cardStyle}>
               <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>
                 💬 {s.heim_oder_auswaerts === 'heim' ? `${s.mannschaften?.name} vs. ${s.gegner}` : `${s.gegner} vs. ${s.mannschaften?.name}`}
@@ -102,7 +88,7 @@ function Chats({ session }) {
             </div>
           </Link>
         ))}
-        {spielChats.length === 0 && <p style={{ fontSize: 13, color: '#5B6D66' }}>Keine aktiven Spielchats (nur nach Veröffentlichung der Aufstellung sichtbar).</p>}
+        {spielChats.length === 0 && <p style={{ fontSize: 13, color: '#5B6D66' }}>Keine anstehenden Spiele.</p>}
       </div>
 
       <BottomNav istAdmin={istAdmin} />
@@ -110,4 +96,4 @@ function Chats({ session }) {
   )
 }
 
-export default Chats
+export default Chats 
