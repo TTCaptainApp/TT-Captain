@@ -14,9 +14,11 @@ function Chats({ session }) {
 
   useEffect(() => {
     const laden = async () => {
+      // 1. Admin-Status prüfen
       const { data: benutzerRow } = await supabase.from('benutzer').select('ist_administrator').eq('id', session.user.id).single()
       setIstAdmin(benutzerRow?.ist_administrator || false)
 
+      // 2. Teamchats laden (alle Teams, in denen der Spieler Mitglied ist)
       const { data: zuordnungen } = await supabase
         .from('mannschaftszuordnungen')
         .select('mannschaft_id, mannschaften(name)')
@@ -24,32 +26,24 @@ function Chats({ session }) {
       const teams = (zuordnungen || []).map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
       setTeamChats(teams)
 
-      const mannschaftIds = teams.map(t => t.mannschaft_id)
+      // 3. Spielchats laden: Nur veröffentlichte Aufstellungen, in denen der User steht
       const heute = new Date().toISOString().slice(0, 10)
 
-      let eigeneSpiele = []
-      if (mannschaftIds.length > 0) {
-        const { data } = await supabase
-          .from('spiele')
-          .select('id, gegner, heim_oder_auswaerts, datum, mannschaften(name)')
-          .in('mannschaft_id', mannschaftIds)
-          .gte('datum', heute)
-          .order('datum')
-        eigeneSpiele = data || []
-      }
+      const { data: meinteAufstellungen } = await supabase
+        .from('aufstellungen')
+        .select('spiel_id, spiele!inner(id, gegner, heim_oder_auswaerts, datum, aufstellung_veroeffentlicht, mannschaften(name))')
+        .eq('benutzer_id', session.user.id)
+        .eq('spiele.aufstellung_veroeffentlicht', true)
+        .gte('spiele.datum', heute)
 
-      const { data: ersatzSpiele } = await supabase
-        .from('ersatzanfragen')
-        .select('spiel_id, spiele(id, gegner, heim_oder_auswaerts, datum, mannschaften(name))')
-        .eq('angefragter_benutzer_id', session.user.id)
-        .eq('status', 'zugesagt')
+      const gefilterteSpiele = (meinteAufstellungen || [])
+        .map(a => a.spiele)
+        .filter(Boolean)
 
-      const ersatzListe = (ersatzSpiele || [])
-        .filter(e => e.spiele)
-        .map(e => e.spiele)
+      // Nach Spieldatum sortieren
+      gefilterteSpiele.sort((a, b) => new Date(a.datum) - new Date(b.datum))
 
-      const alleSpiele = [...eigeneSpiele, ...ersatzListe.filter(s => !eigeneSpiele.some(es => es.id === s.id))]
-      setSpielChats(alleSpiele)
+      setSpielChats(gefilterteSpiele)
       setLadend(false)
     }
     laden()
@@ -91,7 +85,7 @@ function Chats({ session }) {
             </div>
           </Link>
         ))}
-        {spielChats.length === 0 && <p style={{ fontSize: 13, color: '#5B6D66' }}>Keine anstehenden Spiele.</p>}
+        {spielChats.length === 0 && <p style={{ fontSize: 13, color: '#5B6D66' }}>Keine aktiven Spielchats (nur nach Veröffentlichung der Aufstellung sichtbar).</p>}
       </div>
 
       <BottomNav istAdmin={istAdmin} />
