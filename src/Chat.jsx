@@ -20,11 +20,16 @@ function Chat({ session }) {
   const [zeigeEmojis, setZeigeEmojis] = useState(false)
   const [zeigeAnhangMenu, setZeigeAnhangMenu] = useState(false)
   const [medienHochladend, setMedienHochladend] = useState(false)
+  const [namenLexikon, setNamenLexikon] = useState({})
+  const [teilnehmerIds, setTeilnehmerIds] = useState([])
+  const [gelesenMap, setGelesenMap] = useState({})
+  const [infoNachrichtId, setInfoNachrichtId] = useState(null)
   const listeEndeRef = useRef(null)
 
   const nachrichtenLaden = async (cId) => {
     const { data: namen } = await supabase.rpc('teamkollegen_namen')
     const lex = Object.fromEntries((namen || []).map(n => [n.id, `${n.vorname} ${n.nachname}`]))
+    setNamenLexikon(lex)
 
     const { data } = await supabase
       .from('nachrichten')
@@ -33,6 +38,29 @@ function Chat({ session }) {
       .order('gesendet_am')
 
     setNachrichten((data || []).map(n => ({ ...n, name: lex[n.benutzer_id] || (n.benutzer_id === session.user.id ? 'Du' : '?') })))
+
+    const empfangeneIds = (data || []).filter(n => n.benutzer_id !== session.user.id).map(n => n.id)
+    if (empfangeneIds.length > 0) {
+      await supabase.from('nachrichten_gelesen')
+        .upsert(
+          empfangeneIds.map(nachricht_id => ({ nachricht_id, benutzer_id: session.user.id })),
+          { onConflict: 'nachricht_id,benutzer_id', ignoreDuplicates: true }
+        )
+    }
+
+    const eigeneIds = (data || []).filter(n => n.benutzer_id === session.user.id).map(n => n.id)
+    if (eigeneIds.length > 0) {
+      const { data: gelesenRows } = await supabase
+        .from('nachrichten_gelesen')
+        .select('nachricht_id, benutzer_id, gelesen_am')
+        .in('nachricht_id', eigeneIds)
+      const map = {}
+      ;(gelesenRows || []).forEach(g => {
+        if (!map[g.nachricht_id]) map[g.nachricht_id] = []
+        map[g.nachricht_id].push(g)
+      })
+      setGelesenMap(map)
+    }
   }
 
   const initialisieren = async () => {
@@ -45,6 +73,8 @@ function Chat({ session }) {
     if (typ === 'mannschaft') {
       const { data: m } = await supabase.from('mannschaften').select('name').eq('id', mannschaftId).single()
       setTitel(m?.name || 'Teamchat')
+      const { data: mitglieder } = await supabase.from('mannschaftszuordnungen').select('benutzer_id').eq('mannschaft_id', mannschaftId)
+      setTeilnehmerIds((mitglieder || []).map(z => z.benutzer_id).filter(id => id !== session.user.id))
       const { data } = await supabase.from('chats').select('id').eq('typ', 'mannschaft').eq('mannschaft_id', mannschaftId).maybeSingle()
       bestehenderChat = data
     } else {
@@ -65,6 +95,7 @@ function Chat({ session }) {
         setLadend(false)
         return
       }
+      setTeilnehmerIds((aufstellungCheck.aufstellung_spieler || []).map(a => a.benutzer_id).filter(id => id !== session.user.id))
 
       const { data } = await supabase.from('chats').select('id').eq('typ', 'spiel').eq('spiel_id', spielId).maybeSingle()
       bestehenderChat = data
@@ -187,6 +218,8 @@ function Chat({ session }) {
           nachrichten.map(n => {
             const eigene = n.benutzer_id === session.user.id
             const zeit = new Date(n.gesendet_am).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+            const gelesenVon = eigene ? (gelesenMap[n.id] || []) : []
+            const gelesenNamen = gelesenVon.map(g => namenLexikon[g.benutzer_id] || '?')
             return (
               <div key={n.id} style={{ marginBottom: 8, display: 'flex', flexDirection: 'column', alignItems: eigene ? 'flex-end' : 'flex-start' }}>
                 {!eigene && <div style={{ fontSize: 11, fontWeight: 600, color: '#1C8A4E', marginBottom: 2, padding: '0 4px' }}>{n.name}</div>}
@@ -206,9 +239,22 @@ function Chat({ session }) {
                   {!n.medien_url && !n.standort_lat && (
                     <div style={{ paddingRight: 40, lineHeight: 1.4 }}>{n.text}</div>
                   )}
-                  <div style={{ fontSize: 10, color: '#667781', textAlign: 'right', marginTop: 2 }}>
-                    {zeit}{eigene && <span style={{ color: '#53bdeb', fontWeight: 'bold', marginLeft: 4 }}>✓✓</span>}
+                  <div
+                    style={{ fontSize: 10, color: '#667781', textAlign: 'right', marginTop: 2, cursor: eigene ? 'pointer' : 'default' }}
+                    onClick={() => eigene && setInfoNachrichtId(id => id === n.id ? null : n.id)}
+                  >
+                    {zeit}
+                    {eigene && (
+                      <span style={{ color: gelesenVon.length > 0 ? '#53bdeb' : '#8696a0', fontWeight: 'bold', marginLeft: 4 }}>
+                        {gelesenVon.length > 0 ? '✓✓' : '✓'}
+                      </span>
+                    )}
                   </div>
+                  {eigene && infoNachrichtId === n.id && (
+                    <div style={{ fontSize: 11, color: '#5B6D66', marginTop: 4, textAlign: 'right' }}>
+                      {gelesenNamen.length > 0 ? `Gelesen von: ${gelesenNamen.join(', ')}` : 'Noch von niemandem gelesen'}
+                    </div>
+                  )}
                 </div>
               </div>
             )
