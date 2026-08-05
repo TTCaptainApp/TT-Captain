@@ -9,6 +9,8 @@ import Spiele from './Spiele'
 import Aufstellung from './Aufstellung'
 import Chats from './Chats'
 import Chat from './Chat'
+import Profil from './Profil'
+import Admin from './Admin'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -46,6 +48,8 @@ function App() {
       <Route path="/chats" element={<Chats session={session} />} />
       <Route path="/chats/mannschaft/:mannschaftId" element={<Chat session={session} />} />
       <Route path="/chats/spiel/:spielId" element={<Chat session={session} />} />
+      <Route path="/profil" element={<Profil session={session} />} />
+      <Route path="/admin" element={<Admin session={session} />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   )
