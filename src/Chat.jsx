@@ -352,7 +352,7 @@ function Chat({ session }) {
         </button>
       </form>
 
-      <BottomNav istAdmin={istAdmin} />
+      <BottomNav istAdmin={istAdmin} session={session} />
     </div>
   )
 }
