@@ -21,6 +21,28 @@ function Profil({ session }) {
   const [telefonnummer, setTelefonnummer] = useState('')
   const [profilbildHochladend, setProfilbildHochladend] = useState(false)
 
+  // Name ändern
+  const [nameBearbeiten, setNameBearbeiten] = useState(false)
+  const [vornameEingabe, setVornameEingabe] = useState('')
+  const [nachnameEingabe, setNachnameEingabe] = useState('')
+
+  // Passwort ändern
+  const [neuesPasswort, setNeuesPasswort] = useState('')
+  const [neuesPasswortWiederholen, setNeuesPasswortWiederholen] = useState('')
+  const [passwortMeldung, setPasswortMeldung] = useState(null)
+
+  // E-Mail ändern
+  const [neueEmail, setNeueEmail] = useState('')
+  const [emailMeldung, setEmailMeldung] = useState(null)
+
+  // Hauptmannschaft
+  const [hauptmannschaftId, setHauptmannschaftId] = useState(null)
+  const [hauptmannschaftSpeichernLaeuft, setHauptmannschaftSpeichernLaeuft] = useState(false)
+
+  // Konto löschen
+  const [loeschBestaetigenOffen, setLoeschBestaetigenOffen] = useState(false)
+  const [loeschMeldung, setLoeschMeldung] = useState(null)
+
   useEffect(() => {
     async function profilLaden() {
       try {
@@ -35,6 +57,8 @@ function Profil({ session }) {
 
         setProfil(bData)
         setTelefonnummer(bData?.telefonnummer || '')
+        setVornameEingabe(bData?.vorname || '')
+        setNachnameEingabe(bData?.nachname || '')
         setNotifAufstellung(bData?.benachrichtigung_aufstellung ?? true)
         setNotifChat(bData?.benachrichtigung_chat ?? true)
         setNotifEmail(bData?.benachrichtigung_email ?? true)
@@ -42,10 +66,11 @@ function Profil({ session }) {
         // 2. Mannschaften & Rollen des Benutzers abfragen
         const { data: mData } = await supabase
           .from('mannschaftszuordnungen')
-          .select('id, rolle, mannschaften(id, name)')
+          .select('id, rolle, ist_hauptmannschaft, mannschaften(id, name)')
           .eq('benutzer_id', session.user.id)
 
         setMeineMannschaften(mData || [])
+        setHauptmannschaftId(mData?.find(m => m.ist_hauptmannschaft)?.id || null)
 
         // Prüfen, ob der Nutzer mindestens in einem Team Spielführer ist
         const hatSpielfuehrerRolle = mData?.some(m => m.rolle === 'spielfuehrer')
@@ -88,6 +113,73 @@ function Profil({ session }) {
     await supabase.from('benutzer').update({ profilbild_url: urlData.publicUrl }).eq('id', session.user.id)
     setProfil(prev => ({ ...prev, profilbild_url: urlData.publicUrl }))
     setProfilbildHochladend(false)
+  }
+
+  const nameSpeichern = async () => {
+    if (!vornameEingabe.trim() || !nachnameEingabe.trim()) return
+    await supabase.from('benutzer').update({ vorname: vornameEingabe.trim(), nachname: nachnameEingabe.trim() }).eq('id', session.user.id)
+    setProfil(prev => ({ ...prev, vorname: vornameEingabe.trim(), nachname: nachnameEingabe.trim() }))
+    setNameBearbeiten(false)
+  }
+
+  const passwortAendern = async (e) => {
+    e.preventDefault()
+    setPasswortMeldung(null)
+    if (neuesPasswort.length < 6) {
+      setPasswortMeldung({ typ: 'error', text: 'Das Passwort muss mindestens 6 Zeichen haben.' })
+      return
+    }
+    if (neuesPasswort !== neuesPasswortWiederholen) {
+      setPasswortMeldung({ typ: 'error', text: 'Die Passwörter stimmen nicht überein.' })
+      return
+    }
+    const { error } = await supabase.auth.updateUser({ password: neuesPasswort })
+    if (error) {
+      setPasswortMeldung({ typ: 'error', text: error.message })
+    } else {
+      setPasswortMeldung({ typ: 'success', text: 'Passwort erfolgreich geändert.' })
+      setNeuesPasswort('')
+      setNeuesPasswortWiederholen('')
+    }
+  }
+
+  const emailAendern = async (e) => {
+    e.preventDefault()
+    setEmailMeldung(null)
+    if (!neueEmail.trim() || !neueEmail.includes('@')) {
+      setEmailMeldung({ typ: 'error', text: 'Bitte eine gültige E-Mail-Adresse eingeben.' })
+      return
+    }
+    const { error } = await supabase.auth.updateUser({ email: neueEmail.trim() })
+    if (error) {
+      setEmailMeldung({ typ: 'error', text: error.message })
+    } else {
+      setEmailMeldung({ typ: 'success', text: 'Bestätigungslink wurde an die neue Adresse gesendet. Die Änderung wird erst nach Bestätigung aktiv.' })
+      setNeueEmail('')
+    }
+  }
+
+  const hauptmannschaftAendern = async (zuordnungId) => {
+    setHauptmannschaftSpeichernLaeuft(true)
+    await supabase.from('mannschaftszuordnungen').update({ ist_hauptmannschaft: false }).eq('benutzer_id', session.user.id)
+    await supabase.from('mannschaftszuordnungen').update({ ist_hauptmannschaft: true }).eq('id', zuordnungId)
+    setHauptmannschaftId(zuordnungId)
+    setHauptmannschaftSpeichernLaeuft(false)
+  }
+
+  const kontoLoeschungBeantragen = async () => {
+    setLoeschMeldung(null)
+    const { error } = await supabase
+      .from('benutzer')
+      .update({ loeschung_beantragt: true, loeschung_beantragt_am: new Date().toISOString() })
+      .eq('id', session.user.id)
+    if (error) {
+      setLoeschMeldung({ typ: 'error', text: error.message })
+    } else {
+      setProfil(prev => ({ ...prev, loeschung_beantragt: true }))
+      setLoeschMeldung({ typ: 'success', text: 'Löschantrag wurde übermittelt. Ein Administrator wird dein Konto in Kürze löschen.' })
+    }
+    setLoeschBestaetigenOffen(false)
   }
 
   const getRolleLabel = (rolle) => {
@@ -138,9 +230,33 @@ function Profil({ session }) {
             <input type="file" accept="image/*" onChange={profilbildHochladen} style={{ display: 'none' }} disabled={profilbildHochladend} />
           </label>
           <div style={{ flex: 1 }}>
-            <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
-              {profil?.vorname} {profil?.nachname}
-            </h2>
+            {nameBearbeiten ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6 }}>
+                <input
+                  type="text"
+                  value={vornameEingabe}
+                  onChange={e => setVornameEingabe(e.target.value)}
+                  placeholder="Vorname"
+                  style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #DCE7E2', fontSize: 13 }}
+                />
+                <input
+                  type="text"
+                  value={nachnameEingabe}
+                  onChange={e => setNachnameEingabe(e.target.value)}
+                  placeholder="Nachname"
+                  style={{ padding: '6px 8px', borderRadius: 6, border: '1px solid #DCE7E2', fontSize: 13 }}
+                />
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={nameSpeichern} style={{ background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}>Speichern</button>
+                  <button onClick={() => setNameBearbeiten(false)} style={{ background: 'none', border: '1px solid #DCE7E2', borderRadius: 6, padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}>Abbrechen</button>
+                </div>
+              </div>
+            ) : (
+              <h2 style={{ fontSize: 17, fontWeight: 700, margin: 0 }}>
+                {profil?.vorname} {profil?.nachname}{' '}
+                <button onClick={() => setNameBearbeiten(true)} style={{ background: 'none', border: 'none', color: '#1C8A4E', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>✏️</button>
+              </h2>
+            )}
             <p style={{ margin: '2px 0 4px', fontSize: 13, color: '#5B6D66' }}>
               {session?.user?.email}
             </p>
@@ -180,7 +296,20 @@ function Profil({ session }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               {meineMannschaften.map(m => (
                 <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 12px', background: '#F6FAF8', border: '1px solid #DCE7E2', borderRadius: 10 }}>
-                  <span style={{ fontWeight: 600, fontSize: 14 }}>{m.mannschaften?.name}</span>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="radio"
+                      name="hauptmannschaft"
+                      checked={hauptmannschaftId === m.id}
+                      onChange={() => hauptmannschaftAendern(m.id)}
+                      disabled={hauptmannschaftSpeichernLaeuft}
+                      style={{ accentColor: '#1C8A4E' }}
+                    />
+                    <span style={{ fontWeight: 600, fontSize: 14 }}>
+                      {m.mannschaften?.name}
+                      {hauptmannschaftId === m.id && <span style={{ marginLeft: 6, fontSize: 11, color: '#1C8A4E' }}>★ Haupt</span>}
+                    </span>
+                  </label>
                   <span style={{ fontSize: 12, background: '#FFFFFF', padding: '4px 8px', borderRadius: 6, border: '1px solid #DCE7E2', color: '#5B6D66' }}>
                     {getRolleLabel(m.rolle)}
                   </span>
@@ -222,6 +351,54 @@ function Profil({ session }) {
           </div>
         </div>
 
+        {/* KONTO-SICHERHEIT: PASSWORT & E-MAIL */}
+        <div style={{ background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 16, marginBottom: 16 }}>
+          <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, margin: '0 0 12px', color: '#16261F' }}>
+            🔒 Konto-Sicherheit
+          </h3>
+
+          <form onSubmit={passwortAendern} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#5B6D66' }}>Neues Passwort</label>
+            <input
+              type="password"
+              value={neuesPasswort}
+              onChange={e => setNeuesPasswort(e.target.value)}
+              placeholder="Mind. 6 Zeichen"
+              style={{ padding: '9px 10px', borderRadius: 8, border: '1px solid #DCE7E2', fontSize: 14 }}
+            />
+            <input
+              type="password"
+              value={neuesPasswortWiederholen}
+              onChange={e => setNeuesPasswortWiederholen(e.target.value)}
+              placeholder="Passwort wiederholen"
+              style={{ padding: '9px 10px', borderRadius: 8, border: '1px solid #DCE7E2', fontSize: 14 }}
+            />
+            {passwortMeldung && (
+              <p style={{ fontSize: 12.5, margin: 0, color: passwortMeldung.typ === 'error' ? '#c0392b' : '#1C8A4E' }}>{passwortMeldung.text}</p>
+            )}
+            <button type="submit" style={{ background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8, padding: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+              Passwort ändern
+            </button>
+          </form>
+
+          <form onSubmit={emailAendern} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: '#5B6D66' }}>Neue E-Mail-Adresse</label>
+            <input
+              type="email"
+              value={neueEmail}
+              onChange={e => setNeueEmail(e.target.value)}
+              placeholder={session?.user?.email}
+              style={{ padding: '9px 10px', borderRadius: 8, border: '1px solid #DCE7E2', fontSize: 14 }}
+            />
+            {emailMeldung && (
+              <p style={{ fontSize: 12.5, margin: 0, color: emailMeldung.typ === 'error' ? '#c0392b' : '#1C8A4E' }}>{emailMeldung.text}</p>
+            )}
+            <button type="submit" style={{ background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8, padding: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+              E-Mail ändern
+            </button>
+          </form>
+        </div>
+
         {/* BUTTON: ADMIN-/TEAMVERWALTUNG */}
         {(profil?.ist_administrator || istSpielfuehrer) && (
           <button
@@ -241,11 +418,44 @@ function Profil({ session }) {
           onClick={abmelden}
           style={{
             width: '100%', padding: 14, borderRadius: 12, border: '1px solid #F87171', background: '#FEF2F2',
-            color: '#991B1B', fontWeight: 600, fontSize: 14, cursor: 'pointer'
+            color: '#991B1B', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 20
           }}
         >
           🚪 Abmelden
         </button>
+
+        {/* GEFAHRENZONE: KONTO LÖSCHEN */}
+        <div style={{ border: '1px dashed #F87171', borderRadius: 14, padding: 16 }}>
+          <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 13, margin: '0 0 8px', color: '#991B1B' }}>
+            ⚠️ Gefahrenzone
+          </h3>
+          {profil?.loeschung_beantragt ? (
+            <p style={{ fontSize: 13, color: '#5B6D66', margin: 0 }}>
+              Löschantrag wurde bereits übermittelt. Ein Administrator kümmert sich darum.
+            </p>
+          ) : loeschBestaetigenOffen ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ fontSize: 13, color: '#5B6D66', margin: 0 }}>
+                Bist du sicher? Dein Konto wird dann von einem Administrator dauerhaft gelöscht.
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={kontoLoeschungBeantragen} style={{ background: '#991B1B', color: 'white', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  Ja, endgültig beantragen
+                </button>
+                <button onClick={() => setLoeschBestaetigenOffen(false)} style={{ background: 'none', border: '1px solid #DCE7E2', borderRadius: 8, padding: '9px 14px', fontSize: 13, cursor: 'pointer' }}>
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setLoeschBestaetigenOffen(true)} style={{ background: 'none', border: '1px solid #F87171', color: '#991B1B', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              Konto-Löschung beantragen
+            </button>
+          )}
+          {loeschMeldung && (
+            <p style={{ fontSize: 12.5, margin: '8px 0 0', color: loeschMeldung.typ === 'error' ? '#c0392b' : '#1C8A4E' }}>{loeschMeldung.text}</p>
+          )}
+        </div>
       </div>
 
       <BottomNav />
