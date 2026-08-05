@@ -438,9 +438,9 @@ function Spiele({ session }) {
         {spiele.length === 0 && <p style={{ color: '#5B6D66', fontSize: 14 }}>Noch keine Spiele eingetragen.</p>}
       </div>
 
-      <BottomNav istAdmin={istAdmin} />
+      <BottomNav istAdmin={istAdmin} session={session} />
     </div>
   )
 }
 
-export default Spiele
+export default Spiele 
