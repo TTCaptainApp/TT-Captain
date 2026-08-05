@@ -25,8 +25,12 @@ function Chat({ session }) {
   const [gelesenMap, setGelesenMap] = useState({})
   const [infoNachrichtId, setInfoNachrichtId] = useState(null)
   const [scrollZuNachrichtId, setScrollZuNachrichtId] = useState(null)
+  const [zeigeMentionDropdown, setZeigeMentionDropdown] = useState(false)
+  const [mentionSuchbegriff, setMentionSuchbegriff] = useState('')
+  const [mentionStartPos, setMentionStartPos] = useState(null)
   const listeEndeRef = useRef(null)
   const scrollZielRef = useRef(null)
+  const textInputRef = useRef(null)
 
   const renderNachrichtText = (text) => {
     const parts = []
@@ -228,6 +232,38 @@ function Chat({ session }) {
     setZeigeEmojis(false)
   }
 
+  const textEingabeAendern = (e) => {
+    const neuerText = e.target.value
+    const cursorPos = e.target.selectionStart
+    setText(neuerText)
+
+    // Suche nach @ vor der Cursor-Position (ohne Leerzeichen dazwischen)
+    const textVorCursor = neuerText.substring(0, cursorPos)
+    const atMatch = textVorCursor.match(/@([\wÄÖÜäöüß]*)$/)
+
+    if (atMatch) {
+      setMentionSuchbegriff(atMatch[1])
+      setMentionStartPos(cursorPos - atMatch[0].length)
+      setZeigeMentionDropdown(true)
+    } else {
+      setZeigeMentionDropdown(false)
+    }
+  }
+
+  const mentionAuswaehlen = (name) => {
+    const vorMention = text.substring(0, mentionStartPos)
+    const nachCursorPos = mentionStartPos + 1 + mentionSuchbegriff.length
+    const nachMention = text.substring(nachCursorPos)
+    const neuerText = `${vorMention}@${name} ${nachMention}`
+    setText(neuerText)
+    setZeigeMentionDropdown(false)
+    textInputRef.current?.focus()
+  }
+
+  const gefilterteMentionNamen = Object.values(namenLexikon).filter(name =>
+    name.toLowerCase().includes(mentionSuchbegriff.toLowerCase())
+  )
+
   const fotoSenden = async (e) => {
     const datei = e.target.files[0]
     if (!datei || !chatId) return
@@ -363,6 +399,41 @@ function Chat({ session }) {
         </div>
       )}
 
+      {zeigeMentionDropdown && gefilterteMentionNamen.length > 0 && (
+        <div style={{
+          position: 'fixed', bottom: 128, left: 0, right: 0, maxWidth: 480, margin: '0 auto',
+          background: '#ffffff', borderTop: '1px solid #DCE7E2', borderRadius: '12px 12px 0 0',
+          padding: 6, display: 'flex', flexDirection: 'column', gap: 2, zIndex: 1000,
+          boxSizing: 'border-box', maxHeight: 180, overflowY: 'auto',
+          boxShadow: '0 -2px 8px rgba(0,0,0,0.08)'
+        }}>
+          {gefilterteMentionNamen.map(name => (
+            <button
+              key={name}
+              type="button"
+              onClick={() => mentionAuswaehlen(name)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 10, background: 'none', border: 'none',
+                padding: '10px 12px', borderRadius: 8, cursor: 'pointer', textAlign: 'left',
+                fontSize: 14, fontFamily: 'inherit', color: '#16261F', width: '100%'
+              }}
+              onMouseDown={(e) => e.preventDefault()}
+              onMouseEnter={(e) => e.currentTarget.style.background = '#F6FAF8'}
+              onMouseLeave={(e) => e.currentTarget.style.background = 'none'}
+            >
+              <div style={{
+                width: 28, height: 28, borderRadius: '50%', background: '#1C8A4E', color: 'white',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12,
+                fontWeight: 700, flexShrink: 0
+              }}>
+                {name.split(' ').map(p => p[0]).join('').toUpperCase().slice(0, 2)}
+              </div>
+              <span style={{ fontWeight: 600 }}>{name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {zeigeAnhangMenu && (
         <div style={{
           position: 'fixed', bottom: 128, left: 0, right: 0, maxWidth: 480, margin: '0 auto',
@@ -416,10 +487,11 @@ function Chat({ session }) {
             😀
           </button>
           <input
+            ref={textInputRef}
             type="text"
             placeholder="Nachricht..."
             value={text}
-            onChange={e => setText(e.target.value)}
+            onChange={textEingabeAendern}
             style={{ flex: 1, padding: '8px 2px', border: 'none', fontSize: 14, outline: 'none', fontFamily: 'inherit', background: 'transparent', minWidth: 0 }}
           />
           <button
