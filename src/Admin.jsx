@@ -292,40 +292,6 @@ function Admin({ session }) {
           </div>
         )}
 
-        {/* SICHERHEITSABFRAGE: Mannschaft archivieren */}
-        {archivierenBestaetigen && (
-          <div style={{ background: '#FEF9E7', border: '1px solid #F5D76E', borderRadius: 14, padding: 16, marginBottom: 16 }}>
-            <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 14, margin: '0 0 8px', color: '#8A6D1C' }}>
-              ⚠️ Mannschaft "{archivierenBestaetigen.name}" archivieren?
-            </h3>
-            <p style={{ fontSize: 13, color: '#5B6D66', margin: '0 0 6px' }}>
-              Diese Mannschaft hat aktuell:
-            </p>
-            <ul style={{ fontSize: 13, color: '#16261F', margin: '0 0 12px', paddingLeft: 20 }}>
-              <li>{archivierenBestaetigen.mitgliederAnzahl} Mitglieder-Zuordnung(en)</li>
-              <li>{archivierenBestaetigen.spieleAnzahl} Spiel(e)</li>
-            </ul>
-            <p style={{ fontSize: 12.5, color: '#5B6D66', margin: '0 0 14px' }}>
-              Beim Archivieren bleiben alle Daten (Spiele, Chats, Zuordnungen) erhalten. Die Mannschaft verschwindet nur aus den aktiven Listen und kann jederzeit wieder reaktiviert werden.
-            </p>
-            <div style={{ display: 'flex', gap: 8 }}>
-              <button
-                onClick={archivierenBestaetigt}
-                disabled={archivierenLaeuft}
-                style={{ background: '#8A6D1C', color: 'white', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
-              >
-                {archivierenLaeuft ? '...' : 'Ja, archivieren'}
-              </button>
-              <button
-                onClick={() => setArchivierenBestaetigen(null)}
-                style={{ background: 'none', border: '1px solid #DCE7E2', borderRadius: 8, padding: '9px 14px', fontSize: 13, cursor: 'pointer' }}
-              >
-                Abbrechen
-              </button>
-            </div>
-          </div>
-        )}
-
         {/* Neue Zuordnung */}
         <div style={{ background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 16, marginBottom: 16 }}>
           <h2 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, margin: '0 0 14px', color: '#1C8A4E' }}>
@@ -436,23 +402,64 @@ function Admin({ session }) {
               🏓 Mannschaften verwalten
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-              {aktiveMannschaften.map(m => (
-                <div key={m.id} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '12px 14px', background: '#F6FAF8', border: '1px solid #DCE7E2', borderRadius: 10
-                }}>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</span>
-                  <button
-                    onClick={() => archivierenAnfragen(m)}
-                    style={{
-                      background: '#FEF9E7', color: '#8A6D1C', border: '1px solid #F5D76E',
-                      borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer'
-                    }}
-                  >
-                    📦 Archivieren
-                  </button>
-                </div>
-              ))}
+              {aktiveMannschaften.map(m => {
+                const zeigeBestaetigung = archivierenBestaetigen?.id === m.id
+                return (
+                  <div key={m.id}>
+                    <div style={{
+                      display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                      padding: '12px 14px', background: '#F6FAF8', border: '1px solid #DCE7E2',
+                      borderRadius: zeigeBestaetigung ? '10px 10px 0 0' : 10,
+                      borderBottom: zeigeBestaetigung ? 'none' : '1px solid #DCE7E2'
+                    }}>
+                      <span style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</span>
+                      <button
+                        onClick={() => zeigeBestaetigung ? setArchivierenBestaetigen(null) : archivierenAnfragen(m)}
+                        style={{
+                          background: '#FEF9E7', color: '#8A6D1C', border: '1px solid #F5D76E',
+                          borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer'
+                        }}
+                      >
+                        📦 Archivieren
+                      </button>
+                    </div>
+
+                    {/* SICHERHEITSABFRAGE — direkt unter der jeweiligen Mannschaft */}
+                    {zeigeBestaetigung && (
+                      <div style={{
+                        background: '#FEF9E7', border: '1px solid #F5D76E', borderTop: 'none',
+                        borderRadius: '0 0 10px 10px', padding: '14px'
+                      }}>
+                        <p style={{ fontSize: 13, color: '#5B6D66', margin: '0 0 6px', fontWeight: 600 }}>
+                          ⚠️ Wirklich archivieren?
+                        </p>
+                        <ul style={{ fontSize: 12.5, color: '#16261F', margin: '0 0 10px', paddingLeft: 18 }}>
+                          <li>{archivierenBestaetigen.mitgliederAnzahl} Mitglieder-Zuordnung(en)</li>
+                          <li>{archivierenBestaetigen.spieleAnzahl} Spiel(e)</li>
+                        </ul>
+                        <p style={{ fontSize: 11.5, color: '#5B6D66', margin: '0 0 12px' }}>
+                          Alle Daten (Spiele, Chats, Zuordnungen) bleiben erhalten. Die Mannschaft verschwindet nur aus den aktiven Listen und kann jederzeit reaktiviert werden.
+                        </p>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <button
+                            onClick={archivierenBestaetigt}
+                            disabled={archivierenLaeuft}
+                            style={{ background: '#8A6D1C', color: 'white', border: 'none', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+                          >
+                            {archivierenLaeuft ? '...' : 'Ja, archivieren'}
+                          </button>
+                          <button
+                            onClick={() => setArchivierenBestaetigen(null)}
+                            style={{ background: 'none', border: '1px solid #DCE7E2', borderRadius: 8, padding: '8px 12px', fontSize: 12.5, cursor: 'pointer' }}
+                          >
+                            Abbrechen
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
               {aktiveMannschaften.length === 0 && (
                 <p style={{ fontSize: 13, color: '#5B6D66', margin: 0 }}>Keine aktiven Mannschaften vorhanden.</p>
               )}
