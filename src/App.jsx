@@ -11,6 +11,7 @@ import Chats from './Chats'
 import Chat from './Chat'
 import Profil from './Profil'
 import Admin from './Admin'
+import NeuesPasswort from './NeuesPasswort'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -51,6 +52,7 @@ function App() {
       <Route path="/profil" element={<Profil session={session} />} />
       <Route path="/admin" element={<Admin session={session} />} />
       <Route path="*" element={<Navigate to="/" />} />
+      <Route path="/neues-passwort" element={<NeuesPasswort />} />
     </Routes>
   )
 }
