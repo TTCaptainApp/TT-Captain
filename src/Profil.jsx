@@ -42,6 +42,12 @@ function Profil({ session }) {
   const [hauptmannschaftId, setHauptmannschaftId] = useState(null)
   const [hauptmannschaftSpeichernLaeuft, setHauptmannschaftSpeichernLaeuft] = useState(false)
 
+  // QTTR
+  const [qttrBearbeiten, setQttrBearbeiten] = useState(false)
+  const [qttrEingabe, setQttrEingabe] = useState('')
+  const [qttrSpeichernLaeuft, setQttrSpeichernLaeuft] = useState(false)
+  const [qttrMeldung, setQttrMeldung] = useState(null)
+
   // Konto löschen
   const [loeschBestaetigenOffen, setLoeschBestaetigenOffen] = useState(false)
   const [loeschMeldung, setLoeschMeldung] = useState(null)
@@ -62,6 +68,7 @@ function Profil({ session }) {
         setTelefonnummer(bData?.telefonnummer || '')
         setVornameEingabe(bData?.vorname || '')
         setNachnameEingabe(bData?.nachname || '')
+        setQttrEingabe(bData?.qttr?.toString() || '')
         setNotifAufstellung(bData?.benachrichtigung_aufstellung ?? true)
         setNotifChat(bData?.benachrichtigung_chat ?? true)
         setNotifEmail(bData?.benachrichtigung_email ?? true)
@@ -171,6 +178,42 @@ function Profil({ session }) {
     await supabase.from('mannschaftszuordnungen').update({ ist_hauptmannschaft: true }).eq('id', zuordnungId)
     setHauptmannschaftId(zuordnungId)
     setHauptmannschaftSpeichernLaeuft(false)
+  }
+
+  const qttrSpeichern = async () => {
+    setQttrMeldung(null)
+    const wert = parseInt(qttrEingabe, 10)
+
+    if (isNaN(wert) || wert < 0 || wert > 3000) {
+      setQttrMeldung({ typ: 'error', text: 'Bitte einen gültigen QTTR-Wert eingeben (0–3000).' })
+      return
+    }
+
+    setQttrSpeichernLaeuft(true)
+
+    const { error: updateError } = await supabase
+      .from('benutzer')
+      .update({ qttr: wert })
+      .eq('id', session.user.id)
+
+    if (updateError) {
+      setQttrMeldung({ typ: 'error', text: updateError.message })
+      setQttrSpeichernLaeuft(false)
+      return
+    }
+
+    // Verlauf mitschreiben
+    await supabase.from('qttr_verlauf').insert({
+      benutzer_id: session.user.id,
+      qttr_wert: wert,
+      gueltig_ab: new Date().toISOString().slice(0, 10),
+      quelle: 'manuell'
+    })
+
+    setProfil(prev => ({ ...prev, qttr: wert }))
+    setQttrBearbeiten(false)
+    setQttrSpeichernLaeuft(false)
+    setQttrMeldung({ typ: 'success', text: 'QTTR-Wert gespeichert.' })
   }
 
   const kontoLoeschungBeantragen = async () => {
@@ -323,6 +366,78 @@ function Profil({ session }) {
               ))}
             </div>
           )}
+
+          {/* QTTR-BEREICH */}
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #DCE7E2' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: qttrBearbeiten ? 10 : 0 }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13, color: '#16261F' }}>🎯 QTTR-Wert</div>
+                <div style={{ fontSize: 11, color: '#5B6D66' }}>Aktuelle Spielstärke laut myTischtennis.de</div>
+              </div>
+              {!qttrBearbeiten && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <span style={{ fontSize: 18, fontWeight: 700, color: '#1C8A4E' }}>
+                    {profil?.qttr ?? '–'}
+                  </span>
+                  <button
+                    onClick={() => setQttrBearbeiten(true)}
+                    style={{ background: 'none', border: 'none', color: '#1C8A4E', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                  >
+                    ✏️
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {qttrBearbeiten && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min="0"
+                    max="3000"
+                    value={qttrEingabe}
+                    onChange={e => setQttrEingabe(e.target.value)}
+                    placeholder="z.B. 1450"
+                    style={{ flex: 1, padding: '8px 10px', borderRadius: 8, border: '1px solid #DCE7E2', fontSize: 14 }}
+                  />
+                  <button
+                    onClick={qttrSpeichern}
+                    disabled={qttrSpeichernLaeuft}
+                    style={{ background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+                  >
+                    {qttrSpeichernLaeuft ? '...' : 'Speichern'}
+                  </button>
+                  <button
+                    onClick={() => { setQttrBearbeiten(false); setQttrEingabe(profil?.qttr?.toString() || '') }}
+                    style={{ background: 'none', border: '1px solid #DCE7E2', borderRadius: 8, padding: '8px 12px', fontSize: 13, cursor: 'pointer' }}
+                  >
+                    Abbrechen
+                  </button>
+                </div>
+
+                {/* Auto-Import Platzhalter — folgt in einer der nächsten Versionen */}
+                <button
+                  disabled
+                  title="Kommt in Kürze"
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                    background: '#F6FAF8', color: '#9AAAA3', border: '1px dashed #DCE7E2',
+                    borderRadius: 8, padding: '8px 12px', fontSize: 12, fontWeight: 600, cursor: 'not-allowed'
+                  }}
+                >
+                  🔄 Automatisch von myTischtennis.de importieren (bald verfügbar)
+                </button>
+              </div>
+            )}
+
+            {qttrMeldung && (
+              <p style={{ fontSize: 12, margin: '8px 0 0', color: qttrMeldung.typ === 'error' ? '#c0392b' : '#1C8A4E' }}>
+                {qttrMeldung.text}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* BENACHRICHTIGUNGEN */}
