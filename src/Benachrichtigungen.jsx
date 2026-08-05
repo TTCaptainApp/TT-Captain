@@ -6,7 +6,8 @@ const pageStyle = {
   minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif',
   color: '#16261F', padding: '20px 16px 90px', maxWidth: 480, margin: '0 auto'
 }
-const headerStyle = { fontSize: 20, fontWeight: 700, margin: '0 0 16px 0' }
+const headerStyle = { fontSize: 20, fontWeight: 700, margin: '0 0 4px 0' }
+const hinweisStyle = { fontSize: 12.5, color: '#5B6D66', margin: '0 0 16px 0' }
 const itemStyle = (gelesen) => ({
   background: gelesen ? '#ffffff' : '#EAF6EF',
   border: '1px solid #DCE7E2',
@@ -19,11 +20,6 @@ const titelStyle = { fontSize: 14, fontWeight: 700, margin: '0 0 4px 0' }
 const nachrichtStyle = { fontSize: 13, color: '#5B6D66', margin: '0 0 6px 0' }
 const zeitStyle = { fontSize: 11, color: '#8AA098', margin: 0 }
 const leerStyle = { textAlign: 'center', color: '#5B6D66', fontSize: 14, marginTop: 60 }
-const einstellungBoxStyle = {
-  background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 12,
-  padding: '14px 16px', marginBottom: 20, display: 'flex',
-  justifyContent: 'space-between', alignItems: 'center'
-}
 
 function relativZeit(datum) {
   const diffMs = Date.now() - new Date(datum).getTime()
@@ -39,7 +35,6 @@ function relativZeit(datum) {
 function Benachrichtigungen({ session }) {
   const [liste, setListe] = useState([])
   const [ladend, setLadend] = useState(true)
-  const [einstellungAktiv, setEinstellungAktiv] = useState(true)
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -54,13 +49,6 @@ function Benachrichtigungen({ session }) {
         .order('erstellt_am', { ascending: false })
         .limit(50)
       setListe(data || [])
-
-      const { data: einstellung } = await supabase
-        .from('benachrichtigungseinstellungen')
-        .select('aktiv')
-        .eq('benutzer_id', session.user.id)
-        .maybeSingle()
-      setEinstellungAktiv(einstellung ? einstellung.aktiv : true)
       setLadend(false)
     }
     laden()
@@ -77,27 +65,12 @@ function Benachrichtigungen({ session }) {
     if (eintrag.link) navigate(eintrag.link)
   }
 
-  const handleEinstellungToggle = async () => {
-    const neuerWert = !einstellungAktiv
-    setEinstellungAktiv(neuerWert)
-    await supabase
-      .from('benachrichtigungseinstellungen')
-      .upsert({ benutzer_id: session.user.id, aktiv: neuerWert })
-  }
-
   return (
     <div style={pageStyle}>
       <h1 style={headerStyle}>Benachrichtigungen</h1>
-
-      <div style={einstellungBoxStyle}>
-        <span style={{ fontSize: 14 }}>Benachrichtigungen erhalten</span>
-        <input
-          type="checkbox"
-          checked={einstellungAktiv}
-          onChange={handleEinstellungToggle}
-          style={{ width: 20, height: 20 }}
-        />
-      </div>
+      <p style={hinweisStyle}>
+        Welche Ereignisse dich erreichen, stellst du in deinem <a href="/profil" style={{ color: '#1C8A4E' }}>Profil</a> ein.
+      </p>
 
       {ladend && <p style={leerStyle}>Lädt...</p>}
       {!ladend && liste.length === 0 && <p style={leerStyle}>Noch keine Benachrichtigungen.</p>}
