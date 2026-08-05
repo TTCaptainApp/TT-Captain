@@ -24,7 +24,53 @@ function Chat({ session }) {
   const [teilnehmerIds, setTeilnehmerIds] = useState([])
   const [gelesenMap, setGelesenMap] = useState({})
   const [infoNachrichtId, setInfoNachrichtId] = useState(null)
+  const [scrollZuNachrichtId, setScrollZuNachrichtId] = useState(null)
   const listeEndeRef = useRef(null)
+  const scrollZielRef = useRef(null)
+
+  const renderNachrichtText = (text) => {
+    const parts = []
+    let lastIdx = 0
+    
+    // Regex für @Mentions: @ gefolgt von Buchstaben, Zahlen, Umlauten und Spaces (für Vor- und Nachnamen)
+    const regex = /@([\w\sÄÖÜäöüß]+?)(?=\s|$|[.,!?:;])/g
+    let match
+    
+    while ((match = regex.exec(text)) !== null) {
+      // Text vor der Mention hinzufügen
+      if (match.index > lastIdx) {
+        parts.push(text.substring(lastIdx, match.index))
+      }
+      
+      const erwaehnterName = match[1].trim()
+      // Prüfen ob der Name im Lexikon existiert (case-insensitive)
+      const istGueltigeMention = Object.values(namenLexikon).some(name =>
+        name.toLowerCase().includes(erwaehnterName.toLowerCase())
+      )
+      
+      // Mention rendern
+      parts.push(
+        <span key={`mention-${match.index}`} style={{
+          color: istGueltigeMention ? '#1C8A4E' : '#667781',
+          fontWeight: istGueltigeMention ? 600 : 'normal',
+          backgroundColor: istGueltigeMention ? 'rgba(28, 138, 78, 0.15)' : 'transparent',
+          borderRadius: istGueltigeMention ? 4 : 0,
+          padding: istGueltigeMention ? '0 2px' : 0
+        }}>
+          @{erwaehnterName}
+        </span>
+      )
+      
+      lastIdx = regex.lastIndex
+    }
+    
+    // Restlicher Text
+    if (lastIdx < text.length) {
+      parts.push(text.substring(lastIdx))
+    }
+    
+    return parts.length > 0 ? parts : text
+  }
 
   const nachrichtenLaden = async (cId) => {
     const { data: namen } = await supabase.rpc('teamkollegen_namen')
@@ -39,8 +85,32 @@ function Chat({ session }) {
 
     setNachrichten((data || []).map(n => ({ ...n, name: lex[n.benutzer_id] || (n.benutzer_id === session.user.id ? 'Du' : '?') })))
 
+    // Ermittle erste ungelesene Nachricht BEVOR alles als gelesen markiert wird
     const empfangeneIds = (data || []).filter(n => n.benutzer_id !== session.user.id).map(n => n.id)
+    
     if (empfangeneIds.length > 0) {
+      // Prüfe welche bereits gelesen sind
+      const { data: bereitsGelesen } = await supabase
+        .from('nachrichten_gelesen')
+        .select('nachricht_id')
+        .eq('benutzer_id', session.user.id)
+        .in('nachricht_id', empfangeneIds)
+      
+      const gelesenSet = new Set((bereitsGelesen || []).map(g => g.nachricht_id))
+      
+      // Finde erste ungelesene
+      const ersteUngelesene = (data || []).find(n =>
+        n.benutzer_id !== session.user.id && !gelesenSet.has(n.id)
+      )
+      
+      if (ersteUngelesene) {
+        setScrollZuNachrichtId(ersteUngelesene.id)
+      } else {
+        // Wenn alles gelesen, scroll ans Ende
+        setScrollZuNachrichtId(null)
+      }
+
+      // Markiere alle als gelesen
       await supabase.from('nachrichten_gelesen')
         .upsert(
           empfangeneIds.map(nachricht_id => ({ nachricht_id, benutzer_id: session.user.id })),
@@ -48,6 +118,7 @@ function Chat({ session }) {
         )
     }
 
+    // Lade Lesebestätigungen für eigene Nachrichten
     const eigeneIds = (data || []).filter(n => n.benutzer_id === session.user.id).map(n => n.id)
     if (eigeneIds.length > 0) {
       const { data: gelesenRows } = await supabase
@@ -131,9 +202,16 @@ function Chat({ session }) {
     return () => clearInterval(intervall)
   }, [chatId])
 
+  // Scroll zur ersten ungelesenen Nachricht oder ans Ende
   useEffect(() => {
-    listeEndeRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [nachrichten])
+    if (scrollZuNachrichtId && scrollZielRef.current) {
+      setTimeout(() => {
+        scrollZielRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 50)
+    } else if (!scrollZuNachrichtId) {
+      listeEndeRef.current?.scrollIntoView({ behavior: 'smooth' })
+    }
+  }, [nachrichten, scrollZuNachrichtId])
 
   const senden = async (e) => {
     e.preventDefault()
@@ -220,13 +298,21 @@ function Chat({ session }) {
             const zeit = new Date(n.gesendet_am).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
             const gelesenVon = eigene ? (gelesenMap[n.id] || []) : []
             const gelesenNamen = gelesenVon.map(g => namenLexikon[g.benutzer_id] || '?')
+            const istScrollZiel = scrollZuNachrichtId === n.id
+            
             return (
-              <div key={n.id} style={{ marginBottom: 8, display: 'flex', flexDirection: 'column', alignItems: eigene ? 'flex-end' : 'flex-start' }}>
+              <div key={n.id} ref={istScrollZiel ? scrollZielRef : null} style={{ marginBottom: 8, display: 'flex', flexDirection: 'column', alignItems: eigene ? 'flex-end' : 'flex-start' }}>
                 {!eigene && <div style={{ fontSize: 11, fontWeight: 600, color: '#1C8A4E', marginBottom: 2, padding: '0 4px' }}>{n.name}</div>}
                 <div style={{
-                  background: eigene ? '#E7FFDB' : '#ffffff', color: '#111b21', maxWidth: '80%',
-                  padding: '8px 12px 6px', borderRadius: eigene ? '7.5px 0 7.5px 7.5px' : '0 7.5px 7.5px 7.5px',
-                  fontSize: 14, wordBreak: 'break-word', boxShadow: '0 1px 0.5px rgba(11,20,26,.13)'
+                  background: eigene ? '#E7FFDB' : '#ffffff', 
+                  color: '#111b21', 
+                  maxWidth: '80%',
+                  padding: '8px 12px 6px', 
+                  borderRadius: eigene ? '7.5px 0 7.5px 7.5px' : '0 7.5px 7.5px 7.5px',
+                  fontSize: 14, 
+                  wordBreak: 'break-word', 
+                  boxShadow: '0 1px 0.5px rgba(11,20,26,.13)',
+                  border: istScrollZiel ? '2px solid #1C8A4E' : 'none'
                 }}>
                   {n.medien_url && (
                     <img src={n.medien_url} alt="Foto" style={{ maxWidth: '100%', borderRadius: 8, marginBottom: 4, display: 'block' }} />
@@ -237,7 +323,9 @@ function Chat({ session }) {
                     </a>
                   )}
                   {!n.medien_url && !n.standort_lat && (
-                    <div style={{ paddingRight: 40, lineHeight: 1.4 }}>{n.text}</div>
+                    <div style={{ paddingRight: 40, lineHeight: 1.4 }}>
+                      {renderNachrichtText(n.text)}
+                    </div>
                   )}
                   <div
                     style={{ fontSize: 10, color: '#667781', textAlign: 'right', marginTop: 2, cursor: eigene ? 'pointer' : 'default' }}
@@ -357,4 +445,4 @@ function Chat({ session }) {
   )
 }
 
-export default Chat
+export default Chat 
