@@ -9,6 +9,7 @@ function Admin({ session }) {
   const [benutzerListe, setBenutzerListe] = useState([])
   const [mannschaftenListe, setMannschaftenListe] = useState([])
   const [zuordnungen, setZuordnungen] = useState([])
+  const [loeschantraege, setLoeschantraege] = useState([])
   const [istAdmin, setIstAdmin] = useState(false)
   const [ladend, setLadend] = useState(true)
   const [meldung, setMeldung] = useState(null)
@@ -73,6 +74,16 @@ function Admin({ session }) {
 
       setZuordnungen(zData || [])
 
+      // 6. Offene Löschanträge laden (nur für Administratoren)
+      if (adminFlag) {
+        const { data: lData } = await supabase
+          .from('benutzer')
+          .select('id, vorname, nachname, email, loeschung_beantragt_am')
+          .eq('loeschung_beantragt', true)
+          .order('loeschung_beantragt_am')
+        setLoeschantraege(lData || [])
+      }
+
     } catch (err) {
       console.error(err)
     } finally {
@@ -135,6 +146,37 @@ function Admin({ session }) {
     }
   }
 
+  const loeschantragAblehnen = async (benutzerId) => {
+    const { error } = await supabase
+      .from('benutzer')
+      .update({ loeschung_beantragt: false, loeschung_beantragt_am: null })
+      .eq('id', benutzerId)
+
+    if (error) {
+      setMeldung({ typ: 'error', text: error.message })
+    } else {
+      setMeldung({ typ: 'success', text: 'Löschantrag abgelehnt.' })
+      datenLaden()
+    }
+  }
+
+  const kontoEndgueltigLoeschen = async (benutzerId, name) => {
+    if (!window.confirm(`"${name}" wirklich endgültig löschen? Alle Mannschaftszuordnungen und Profildaten werden entfernt.`)) return
+
+    await supabase.from('mannschaftszuordnungen').delete().eq('benutzer_id', benutzerId)
+    const { error } = await supabase.from('benutzer').delete().eq('id', benutzerId)
+
+    if (error) {
+      setMeldung({ typ: 'error', text: error.message })
+    } else {
+      setMeldung({
+        typ: 'success',
+        text: 'Profil gelöscht. Der Login-Zugang (Auth-Konto) muss zusätzlich manuell im Supabase-Dashboard unter Authentication → Users entfernt werden.'
+      })
+      datenLaden()
+    }
+  }
+
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
       <div style={{ padding: '18px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff' }}>
@@ -161,6 +203,39 @@ function Admin({ session }) {
           <div style={{ textAlign: 'center', padding: 40, color: '#5B6D66' }}>Laden...</div>
         ) : (
           <>
+            {/* OFFENE LÖSCHANTRÄGE */}
+            {istAdmin && loeschantraege.length > 0 && (
+              <div style={{ background: '#FEF2F2', border: '1px solid #F87171', borderRadius: 14, padding: 16, marginBottom: 24 }}>
+                <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, margin: '0 0 12px', color: '#991B1B' }}>
+                  ⚠️ Offene Löschanträge ({loeschantraege.length})
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {loeschantraege.map(l => (
+                    <div key={l.id} style={{ background: '#ffffff', border: '1px solid #F87171', borderRadius: 10, padding: 10 }}>
+                      <div style={{ fontWeight: 600, fontSize: 14 }}>{l.vorname} {l.nachname}</div>
+                      <div style={{ fontSize: 12, color: '#5B6D66', marginBottom: 8 }}>
+                        {l.email} · beantragt am {l.loeschung_beantragt_am ? new Date(l.loeschung_beantragt_am).toLocaleDateString('de-DE') : '–'}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <button
+                          onClick={() => kontoEndgueltigLoeschen(l.id, `${l.vorname} ${l.nachname}`)}
+                          style={{ background: '#991B1B', color: 'white', border: 'none', borderRadius: 7, padding: '7px 12px', fontSize: 12.5, fontWeight: 600, cursor: 'pointer' }}
+                        >
+                          Endgültig löschen
+                        </button>
+                        <button
+                          onClick={() => loeschantragAblehnen(l.id)}
+                          style={{ background: 'none', border: '1px solid #DCE7E2', borderRadius: 7, padding: '7px 12px', fontSize: 12.5, cursor: 'pointer' }}
+                        >
+                          Ablehnen
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* MANNSCHAFT & ROLLE ZUWEISEN */}
             <div style={{ background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 16, marginBottom: 24 }}>
               <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, margin: '0 0 12px', color: '#1C8A4E' }}>
@@ -277,4 +352,3 @@ function Admin({ session }) {
 }
 
 export default Admin
- 
