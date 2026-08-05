@@ -17,7 +17,8 @@ function Mannschaften({ session }) {
   const [kopiert, setKopiert] = useState(null)
 
   const ladeMannschaften = async (vId) => {
-    const { data } = await supabase.from('mannschaften').select('id, name').eq('verein_id', vId).order('name')
+    // Nur nicht-archivierte Mannschaften anzeigen
+    const { data } = await supabase.from('mannschaften').select('id, name').eq('verein_id', vId).eq('archiviert', false).order('name')
     setMannschaften(data || [])
   }
 
@@ -114,4 +115,4 @@ function Mannschaften({ session }) {
   )
 }
 
-export default Mannschaften
+export default Mannschaften 
