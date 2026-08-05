@@ -1,8 +1,36 @@
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
+import { supabase } from './supabaseClient'
 
-export function BottomNav({ istAdmin }) {
+export function BottomNav({ istAdmin, session }) {
   const location = useLocation()
   const path = location.pathname
+  const [ungelesen, setUngelesen] = useState(0)
+
+  useEffect(() => {
+    if (!session?.user?.id) return
+
+    const ladeAnzahl = async () => {
+      const { count } = await supabase
+        .from('benachrichtigungen')
+        .select('id', { count: 'exact', head: true })
+        .eq('benutzer_id', session.user.id)
+        .eq('gelesen', false)
+      setUngelesen(count || 0)
+    }
+    ladeAnzahl()
+
+    const channel = supabase
+      .channel('benachrichtigungen-badge')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'benachrichtigungen', filter: `benutzer_id=eq.${session.user.id}` },
+        () => ladeAnzahl()
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [session?.user?.id])
 
   const itemStyle = (aktiv) => ({
     display: 'flex',
@@ -12,8 +40,27 @@ export function BottomNav({ istAdmin }) {
     fontSize: 11,
     fontWeight: aktiv ? 700 : 500,
     color: aktiv ? '#1C8A4E' : '#5B6D66',
-    gap: 2
+    gap: 2,
+    position: 'relative'
   })
+
+  const badgeStyle = {
+    position: 'absolute',
+    top: -4,
+    right: -8,
+    background: '#c0392b',
+    color: 'white',
+    borderRadius: 9,
+    minWidth: 16,
+    height: 16,
+    fontSize: 10,
+    fontWeight: 700,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '0 3px',
+    lineHeight: 1
+  }
 
   return (
     <div style={{
@@ -50,6 +97,14 @@ export function BottomNav({ istAdmin }) {
         <span>Teams</span>
       </Link>
 
+      <Link to="/benachrichtigungen" style={itemStyle(path.startsWith('/benachrichtigungen'))}>
+        <span style={{ fontSize: 18, position: 'relative' }}>
+          🔔
+          {ungelesen > 0 && <span style={badgeStyle}>{ungelesen > 9 ? '9+' : ungelesen}</span>}
+        </span>
+        <span>Info</span>
+      </Link>
+
       <Link to="/profil" style={itemStyle(path === '/profil' || path === '/admin')}>
         <span style={{ fontSize: 18 }}>👤</span>
         <span>Profil</span>
@@ -58,4 +113,4 @@ export function BottomNav({ istAdmin }) {
   )
 }
 
-export default BottomNav
+export default BottomNav 
