@@ -15,6 +15,9 @@ function Profil({ session }) {
   const [notifAufstellung, setNotifAufstellung] = useState(true)
   const [notifChat, setNotifChat] = useState(true)
   const [notifEmail, setNotifEmail] = useState(true)
+  const [notifSpieländerung, setNotifSpieländerung] = useState(true)
+  const [notifErinnerung, setNotifErinnerung] = useState(true)
+  const [notifErsatzanfrage, setNotifErsatzanfrage] = useState(true)
 
   // Profilbearbeitung
   const [bearbeitenModus, setBearbeitenModus] = useState(false)
@@ -62,6 +65,9 @@ function Profil({ session }) {
         setNotifAufstellung(bData?.benachrichtigung_aufstellung ?? true)
         setNotifChat(bData?.benachrichtigung_chat ?? true)
         setNotifEmail(bData?.benachrichtigung_email ?? true)
+        setNotifSpieländerung(bData?.benachrichtigung_spieländerung ?? true)
+        setNotifErinnerung(bData?.benachrichtigung_erinnerung ?? true)
+        setNotifErsatzanfrage(bData?.benachrichtigung_ersatzanfrage ?? true)
 
         // 2. Mannschaften & Rollen des Benutzers abfragen
         const { data: mData } = await supabase
@@ -338,129 +344,3 @@ function Profil({ session }) {
                 <div style={{ fontWeight: 600, fontSize: 13 }}>Chat-Nachrichten</div>
                 <div style={{ fontSize: 11, color: '#5B6D66' }}>Benachrichtigen bei neuen Nachrichten im Team-/Spielchat</div>
               </div>
-              <input type="checkbox" checked={notifChat} onChange={e => notifAendern('benachrichtigung_chat', e.target.checked, setNotifChat)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
-            </label>
-
-            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
-              <div>
-                <div style={{ fontWeight: 600, fontSize: 13 }}>E-Mail Zusammenfassung</div>
-                <div style={{ fontSize: 11, color: '#5B6D66' }}>Wichtige Termine und Änderungen per E-Mail erhalten</div>
-              </div>
-              <input type="checkbox" checked={notifEmail} onChange={e => notifAendern('benachrichtigung_email', e.target.checked, setNotifEmail)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
-            </label>
-          </div>
-        </div>
-
-        {/* KONTO-SICHERHEIT: PASSWORT & E-MAIL */}
-        <div style={{ background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 16, marginBottom: 16 }}>
-          <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, margin: '0 0 12px', color: '#16261F' }}>
-            🔒 Konto-Sicherheit
-          </h3>
-
-          <form onSubmit={passwortAendern} style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 18 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#5B6D66' }}>Neues Passwort</label>
-            <input
-              type="password"
-              value={neuesPasswort}
-              onChange={e => setNeuesPasswort(e.target.value)}
-              placeholder="Mind. 6 Zeichen"
-              style={{ padding: '9px 10px', borderRadius: 8, border: '1px solid #DCE7E2', fontSize: 14 }}
-            />
-            <input
-              type="password"
-              value={neuesPasswortWiederholen}
-              onChange={e => setNeuesPasswortWiederholen(e.target.value)}
-              placeholder="Passwort wiederholen"
-              style={{ padding: '9px 10px', borderRadius: 8, border: '1px solid #DCE7E2', fontSize: 14 }}
-            />
-            {passwortMeldung && (
-              <p style={{ fontSize: 12.5, margin: 0, color: passwortMeldung.typ === 'error' ? '#c0392b' : '#1C8A4E' }}>{passwortMeldung.text}</p>
-            )}
-            <button type="submit" style={{ background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8, padding: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-              Passwort ändern
-            </button>
-          </form>
-
-          <form onSubmit={emailAendern} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            <label style={{ fontSize: 12, fontWeight: 600, color: '#5B6D66' }}>Neue E-Mail-Adresse</label>
-            <input
-              type="email"
-              value={neueEmail}
-              onChange={e => setNeueEmail(e.target.value)}
-              placeholder={session?.user?.email}
-              style={{ padding: '9px 10px', borderRadius: 8, border: '1px solid #DCE7E2', fontSize: 14 }}
-            />
-            {emailMeldung && (
-              <p style={{ fontSize: 12.5, margin: 0, color: emailMeldung.typ === 'error' ? '#c0392b' : '#1C8A4E' }}>{emailMeldung.text}</p>
-            )}
-            <button type="submit" style={{ background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8, padding: 10, fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-              E-Mail ändern
-            </button>
-          </form>
-        </div>
-
-        {/* BUTTON: ADMIN-/TEAMVERWALTUNG */}
-        {(profil?.ist_administrator || istSpielfuehrer) && (
-          <button
-            onClick={() => navigate('/admin')}
-            style={{
-              width: '100%', padding: 14, borderRadius: 12, border: '1px solid #1C8A4E', background: '#ffffff',
-              color: '#1C8A4E', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 12,
-              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
-            }}
-          >
-            ⚙️ {profil?.ist_administrator ? 'Zum Adminbereich' : 'Zur Teamverwaltung'}
-          </button>
-        )}
-
-        {/* ABMELDEN */}
-        <button
-          onClick={abmelden}
-          style={{
-            width: '100%', padding: 14, borderRadius: 12, border: '1px solid #F87171', background: '#FEF2F2',
-            color: '#991B1B', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 20
-          }}
-        >
-          🚪 Abmelden
-        </button>
-
-        {/* GEFAHRENZONE: KONTO LÖSCHEN */}
-        <div style={{ border: '1px dashed #F87171', borderRadius: 14, padding: 16 }}>
-          <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 13, margin: '0 0 8px', color: '#991B1B' }}>
-            ⚠️ Gefahrenzone
-          </h3>
-          {profil?.loeschung_beantragt ? (
-            <p style={{ fontSize: 13, color: '#5B6D66', margin: 0 }}>
-              Löschantrag wurde bereits übermittelt. Ein Administrator kümmert sich darum.
-            </p>
-          ) : loeschBestaetigenOffen ? (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              <p style={{ fontSize: 13, color: '#5B6D66', margin: 0 }}>
-                Bist du sicher? Dein Konto wird dann von einem Administrator dauerhaft gelöscht.
-              </p>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button onClick={kontoLoeschungBeantragen} style={{ background: '#991B1B', color: 'white', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-                  Ja, endgültig beantragen
-                </button>
-                <button onClick={() => setLoeschBestaetigenOffen(false)} style={{ background: 'none', border: '1px solid #DCE7E2', borderRadius: 8, padding: '9px 14px', fontSize: 13, cursor: 'pointer' }}>
-                  Abbrechen
-                </button>
-              </div>
-            </div>
-          ) : (
-            <button onClick={() => setLoeschBestaetigenOffen(true)} style={{ background: 'none', border: '1px solid #F87171', color: '#991B1B', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              Konto-Löschung beantragen
-            </button>
-          )}
-          {loeschMeldung && (
-            <p style={{ fontSize: 12.5, margin: '8px 0 0', color: loeschMeldung.typ === 'error' ? '#c0392b' : '#1C8A4E' }}>{loeschMeldung.text}</p>
-          )}
-        </div>
-      </div>
-
-      <BottomNav />
-    </div>
-  )
-}
-
-export default Profil
