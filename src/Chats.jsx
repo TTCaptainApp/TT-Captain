@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
@@ -85,7 +85,7 @@ function Chats({ session }) {
         {spielChats.length === 0 && <p style={{ fontSize: 13, color: '#5B6D66' }}>Keine anstehenden Spiele.</p>}
       </div>
 
-      <BottomNav istAdmin={istAdmin} />
+      <BottomNav istAdmin={istAdmin} session={session} />
     </div>
   )
 }
