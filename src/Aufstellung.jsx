@@ -328,7 +328,7 @@ function Aufstellung({ session }) {
         )}
       </div>
 
-      <BottomNav istAdmin={istAdmin} />
+      <BottomNav istAdmin={istAdmin} session={session} />
     </div>
   )
 }
