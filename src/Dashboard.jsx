@@ -1,4 +1,4 @@
- import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
 import BottomNav from './BottomNav'
@@ -283,4 +283,60 @@ function Dashboard({ session }) {
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => zusageSetzen(s.id, 'zugesagt')} style={{ ...smallButtonStyle, borderColor: '#1C8A4E', color: '#1C8A4E' }}>
                     ✅ Zusage
-                  </button> 
+                  </button>
+                  <button onClick={() => zusageSetzen(s.id, 'abgesagt')} style={{ ...smallButtonStyle, borderColor: '#c0392b', color: '#c0392b' }}>
+                    ❌ Absage
+                  </button>
+                </div>
+              </div>
+            ))}
+
+            {versteckteAnzahl > 0 && (
+              <button
+                onClick={() => setAlleAnzeigen(true)}
+                style={{ marginTop: 8, background: 'none', border: 'none', color: '#1C8A4E', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+              >
+                + {versteckteAnzahl} weitere anzeigen
+              </button>
+            )}
+            {alleAnzeigen && offeneOhneNaechstes.length > ANZAHL_SICHTBAR && (
+              <button
+                onClick={() => setAlleAnzeigen(false)}
+                style={{ marginTop: 8, background: 'none', border: 'none', color: '#5B6D66', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+              >
+                Weniger anzeigen
+              </button>
+            )}
+          </div>
+        )}
+
+        <div style={{ background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 16, padding: '20px 18px', marginBottom: 16 }}>
+          <div style={{
+            fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700,
+            letterSpacing: '.06em', textTransform: 'uppercase', color: '#23D2A0', marginBottom: 6
+          }}>
+            Los geht's
+          </div>
+          <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5 }}>
+            Schau unter <strong>Spiele</strong> vorbei, um die Spielübersicht deiner Mannschaft(en) zu sehen.
+            {istAdmin && <> Als Admin verwaltest du unter <strong>Mannschaften</strong> Teams und Einladungslinks.</>}
+          </p>
+        </div>
+
+        <button
+          onClick={() => supabase.auth.signOut()}
+          style={{
+            background: 'transparent', border: '1px solid #1C8A4E', color: '#1C8A4E',
+            borderRadius: 8, padding: '9px 18px', cursor: 'pointer', fontSize: 14, fontWeight: 600
+          }}
+        >
+          Abmelden
+        </button>
+      </div>
+
+      <BottomNav istAdmin={istAdmin} session={session} />
+    </div>
+  )
+}
+
+export default Dashboard
