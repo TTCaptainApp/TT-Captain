@@ -8,6 +8,7 @@ function Admin({ session }) {
   const navigate = useNavigate()
   const [benutzerListe, setBenutzerListe] = useState([])
   const [mannschaftenListe, setMannschaftenListe] = useState([])
+  const [alleMannschaften, setAlleMannschaften] = useState([])
   const [zuordnungen, setZuordnungen] = useState([])
   const [loeschantraege, setLoeschantraege] = useState([])
   const [istAdmin, setIstAdmin] = useState(false)
@@ -18,6 +19,11 @@ function Admin({ session }) {
   const [selectedBenutzer, setSelectedBenutzer] = useState('')
   const [selectedMannschaft, setSelectedMannschaft] = useState('')
   const [selectedRolle, setSelectedRolle] = useState('spieler')
+
+  // Mannschaft archivieren
+  const [archivierenBestaetigen, setArchivierenBestaetigen] = useState(null) // { id, name, spieleAnzahl, mitgliederAnzahl }
+  const [zeigeArchivierte, setZeigeArchivierte] = useState(false)
+  const [archivierenLaeuft, setArchivierenLaeuft] = useState(false)
 
   const datenLaden = async () => {
     try {
@@ -58,14 +64,24 @@ function Admin({ session }) {
       setBenutzerListe(bData || [])
       if (bData && bData.length > 0) setSelectedBenutzer(bData[0].id)
 
-      // 4. Mannschaften laden (Admin = Alle, Spielführer = Nur eigene)
-      let mQuery = supabase.from('mannschaften').select('id, name').order('name')
+      // 4. Mannschaften laden (Admin = Alle nicht-archivierten, Spielführer = Nur eigene)
+      let mQuery = supabase.from('mannschaften').select('id, name, archiviert').eq('archiviert', false).order('name')
       if (!adminFlag) {
         mQuery = mQuery.in('id', gefuehrteTeamIds)
       }
       const { data: mData } = await mQuery
       setMannschaftenListe(mData || [])
       if (mData && mData.length > 0) setSelectedMannschaft(mData[0].id)
+
+      // 4b. Für Admin: ALLE Mannschaften (inkl. archiviert) für die Verwaltungs-Sektion laden
+      if (adminFlag) {
+        const { data: alleM } = await supabase
+          .from('mannschaften')
+          .select('id, name, archiviert, archiviert_am')
+          .order('archiviert')
+          .order('name')
+        setAlleMannschaften(alleM || [])
+      }
 
       // 5. Zuordnungen laden
       let zQuery = supabase
@@ -162,6 +178,71 @@ function Admin({ session }) {
     }
   }
 
+  // Klick auf "Archivieren" -> lädt Betroffenheits-Zahlen und öffnet Sicherheitsabfrage
+  const archivierenAnfragen = async (mannschaft) => {
+    setMeldung(null)
+    try {
+      const { count: spieleAnzahl } = await supabase
+        .from('spiele')
+        .select('id', { count: 'exact', head: true })
+        .eq('mannschaft_id', mannschaft.id)
+
+      const { count: mitgliederAnzahl } = await supabase
+        .from('mannschaftszuordnungen')
+        .select('id', { count: 'exact', head: true })
+        .eq('mannschaft_id', mannschaft.id)
+
+      setArchivierenBestaetigen({
+        id: mannschaft.id,
+        name: mannschaft.name,
+        spieleAnzahl: spieleAnzahl || 0,
+        mitgliederAnzahl: mitgliederAnzahl || 0
+      })
+    } catch (err) {
+      console.error(err)
+      setMeldung({ typ: 'error', text: 'Fehler beim Prüfen der Mannschaftsdaten.' })
+    }
+  }
+
+  const archivierenBestaetigt = async () => {
+    if (!archivierenBestaetigen) return
+    setArchivierenLaeuft(true)
+    try {
+      const { error } = await supabase
+        .from('mannschaften')
+        .update({ archiviert: true, archiviert_am: new Date().toISOString() })
+        .eq('id', archivierenBestaetigen.id)
+
+      if (error) throw error
+
+      setMeldung({ typ: 'success', text: `Mannschaft "${archivierenBestaetigen.name}" wurde archiviert.` })
+      setArchivierenBestaetigen(null)
+      datenLaden()
+    } catch (err) {
+      console.error(err)
+      setMeldung({ typ: 'error', text: 'Fehler beim Archivieren der Mannschaft.' })
+    } finally {
+      setArchivierenLaeuft(false)
+    }
+  }
+
+  const reaktivieren = async (mannschaft) => {
+    if (!confirm(`Mannschaft "${mannschaft.name}" wieder aktivieren?`)) return
+    try {
+      const { error } = await supabase
+        .from('mannschaften')
+        .update({ archiviert: false, archiviert_am: null })
+        .eq('id', mannschaft.id)
+
+      if (error) throw error
+      setMeldung({ typ: 'success', text: `Mannschaft "${mannschaft.name}" wurde reaktiviert.` })
+      datenLaden()
+    } catch (err) {
+      console.error(err)
+      setMeldung({ typ: 'error', text: 'Fehler beim Reaktivieren.' })
+    }
+  }
+
   const getRolleLabel = (rolle) => {
     switch (rolle) {
       case 'spielfuehrer': return '📋 Spielführer'
@@ -180,6 +261,9 @@ function Admin({ session }) {
       </div>
     )
   }
+
+  const aktiveMannschaften = alleMannschaften.filter(m => !m.archiviert)
+  const archivierteMannschaften = alleMannschaften.filter(m => m.archiviert)
 
   return (
     <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
@@ -205,6 +289,40 @@ function Admin({ session }) {
             border: `1px solid ${meldung.typ === 'error' ? '#F5A5A0' : '#BFFFAD'}`
           }}>
             {meldung.typ === 'error' ? '❌' : '✅'} {meldung.text}
+          </div>
+        )}
+
+        {/* SICHERHEITSABFRAGE: Mannschaft archivieren */}
+        {archivierenBestaetigen && (
+          <div style={{ background: '#FEF9E7', border: '1px solid #F5D76E', borderRadius: 14, padding: 16, marginBottom: 16 }}>
+            <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 14, margin: '0 0 8px', color: '#8A6D1C' }}>
+              ⚠️ Mannschaft "{archivierenBestaetigen.name}" archivieren?
+            </h3>
+            <p style={{ fontSize: 13, color: '#5B6D66', margin: '0 0 6px' }}>
+              Diese Mannschaft hat aktuell:
+            </p>
+            <ul style={{ fontSize: 13, color: '#16261F', margin: '0 0 12px', paddingLeft: 20 }}>
+              <li>{archivierenBestaetigen.mitgliederAnzahl} Mitglieder-Zuordnung(en)</li>
+              <li>{archivierenBestaetigen.spieleAnzahl} Spiel(e)</li>
+            </ul>
+            <p style={{ fontSize: 12.5, color: '#5B6D66', margin: '0 0 14px' }}>
+              Beim Archivieren bleiben alle Daten (Spiele, Chats, Zuordnungen) erhalten. Die Mannschaft verschwindet nur aus den aktiven Listen und kann jederzeit wieder reaktiviert werden.
+            </p>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                onClick={archivierenBestaetigt}
+                disabled={archivierenLaeuft}
+                style={{ background: '#8A6D1C', color: 'white', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}
+              >
+                {archivierenLaeuft ? '...' : 'Ja, archivieren'}
+              </button>
+              <button
+                onClick={() => setArchivierenBestaetigen(null)}
+                style={{ background: 'none', border: '1px solid #DCE7E2', borderRadius: 8, padding: '9px 14px', fontSize: 13, cursor: 'pointer' }}
+              >
+                Abbrechen
+              </button>
+            </div>
           </div>
         )}
 
@@ -303,16 +421,82 @@ function Admin({ session }) {
                 fontSize: 14,
                 cursor: 'pointer',
                 fontFamily: 'Inter, sans-serif',
-                marginTop: 4,
-                transition: 'all 0.2s'
+                marginTop: 4
               }}
-              onMouseEnter={(e) => e.target.style.background = '#157A3E'}
-              onMouseLeave={(e) => e.target.style.background = '#1C8A4E'}
             >
               Zuordnung speichern
             </button>
           </form>
         </div>
+
+        {/* MANNSCHAFTEN VERWALTEN (nur Admin) */}
+        {istAdmin && (
+          <div style={{ background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 16, marginBottom: 16 }}>
+            <h2 style={{ fontFamily: 'Sora, sans-serif', fontSize: 15, margin: '0 0 14px', color: '#1C8A4E' }}>
+              🏓 Mannschaften verwalten
+            </h2>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+              {aktiveMannschaften.map(m => (
+                <div key={m.id} style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '12px 14px', background: '#F6FAF8', border: '1px solid #DCE7E2', borderRadius: 10
+                }}>
+                  <span style={{ fontWeight: 600, fontSize: 13 }}>{m.name}</span>
+                  <button
+                    onClick={() => archivierenAnfragen(m)}
+                    style={{
+                      background: '#FEF9E7', color: '#8A6D1C', border: '1px solid #F5D76E',
+                      borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer'
+                    }}
+                  >
+                    📦 Archivieren
+                  </button>
+                </div>
+              ))}
+              {aktiveMannschaften.length === 0 && (
+                <p style={{ fontSize: 13, color: '#5B6D66', margin: 0 }}>Keine aktiven Mannschaften vorhanden.</p>
+              )}
+            </div>
+
+            {archivierteMannschaften.length > 0 && (
+              <div style={{ marginTop: 14, paddingTop: 14, borderTop: '1px solid #DCE7E2' }}>
+                <button
+                  onClick={() => setZeigeArchivierte(z => !z)}
+                  style={{ background: 'none', border: 'none', color: '#5B6D66', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+                >
+                  {zeigeArchivierte ? '▲' : '▼'} Archivierte Mannschaften ({archivierteMannschaften.length})
+                </button>
+
+                {zeigeArchivierte && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 10 }}>
+                    {archivierteMannschaften.map(m => (
+                      <div key={m.id} style={{
+                        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                        padding: '12px 14px', background: '#F1F1F1', border: '1px solid #DCE7E2', borderRadius: 10
+                      }}>
+                        <div>
+                          <div style={{ fontWeight: 600, fontSize: 13, color: '#5B6D66' }}>{m.name}</div>
+                          <div style={{ fontSize: 11, color: '#9AAAA3' }}>
+                            Archiviert am {new Date(m.archiviert_am).toLocaleDateString('de-DE')}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => reaktivieren(m)}
+                          style={{
+                            background: '#E8F5E9', color: '#1C8A4E', border: '1px solid #BFFFAD',
+                            borderRadius: 8, padding: '7px 12px', fontSize: 12, fontWeight: 600, cursor: 'pointer'
+                          }}
+                        >
+                          ↩️ Reaktivieren
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Aktive Zuordnungen */}
         <div style={{ background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 16, marginBottom: 16 }}>
@@ -354,16 +538,7 @@ function Admin({ session }) {
                       fontWeight: 600,
                       cursor: 'pointer',
                       fontFamily: 'Inter, sans-serif',
-                      transition: 'all 0.2s',
                       whiteSpace: 'nowrap'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.background = '#F5A5A0'
-                      e.target.style.color = 'white'
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.background = '#FEF2F2'
-                      e.target.style.color = '#991B1B'
                     }}
                   >
                     🗑️ Löschen
@@ -412,11 +587,8 @@ function Admin({ session }) {
                       fontWeight: 600,
                       cursor: 'pointer',
                       fontFamily: 'Inter, sans-serif',
-                      transition: 'all 0.2s',
                       whiteSpace: 'nowrap'
                     }}
-                    onMouseEnter={(e) => e.target.style.background = '#7A1515'}
-                    onMouseLeave={(e) => e.target.style.background = '#991B1B'}
                   >
                     ✓ Löschen
                   </button>
@@ -448,4 +620,4 @@ function Admin({ session }) {
   )
 }
 
-export default Admin 
+export default Admin
