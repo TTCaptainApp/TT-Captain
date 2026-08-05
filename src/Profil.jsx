@@ -344,3 +344,105 @@ function Profil({ session }) {
                 <div style={{ fontWeight: 600, fontSize: 13 }}>Chat-Nachrichten</div>
                 <div style={{ fontSize: 11, color: '#5B6D66' }}>Benachrichtigen bei neuen Nachrichten im Team-/Spielchat</div>
               </div>
+              <input type="checkbox" checked={notifChat} onChange={e => notifAendern('benachrichtigung_chat', e.target.checked, setNotifChat)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
+            </label>
+
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Spieländerungen</div>
+                <div style={{ fontSize: 11, color: '#5B6D66' }}>Benachrichtigen bei Änderung von Zeit, Ort oder Status eines Spiels</div>
+              </div>
+              <input type="checkbox" checked={notifSpieländerung} onChange={e => notifAendern('benachrichtigung_spieländerung', e.target.checked, setNotifSpieländerung)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
+            </label>
+
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Verfügbarkeits-Erinnerung</div>
+                <div style={{ fontSize: 11, color: '#5B6D66' }}>Erinnern, wenn noch keine Rückmeldung zu einem nahenden Spiel vorliegt</div>
+              </div>
+              <input type="checkbox" checked={notifErinnerung} onChange={e => notifAendern('benachrichtigung_erinnerung', e.target.checked, setNotifErinnerung)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
+            </label>
+
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>Ersatzspieler-Anfragen</div>
+                <div style={{ fontSize: 11, color: '#5B6D66' }}>Benachrichtigen, wenn du als Ersatz angefragt wirst</div>
+              </div>
+              <input type="checkbox" checked={notifErsatzanfrage} onChange={e => notifAendern('benachrichtigung_ersatzanfrage', e.target.checked, setNotifErsatzanfrage)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
+            </label>
+
+            <label style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}>
+              <div>
+                <div style={{ fontWeight: 600, fontSize: 13 }}>E-Mail Zusammenfassung</div>
+                <div style={{ fontSize: 11, color: '#5B6D66' }}>Wichtige Termine und Änderungen per E-Mail erhalten</div>
+              </div>
+              <input type="checkbox" checked={notifEmail} onChange={e => notifAendern('benachrichtigung_email', e.target.checked, setNotifEmail)} style={{ accentColor: '#1C8A4E', width: 18, height: 18 }} />
+            </label>
+          </div>
+        </div>
+
+        {/* BUTTON: ADMIN-/TEAMVERWALTUNG */}
+        {(profil?.ist_administrator || istSpielfuehrer) && (
+          <button
+            onClick={() => navigate('/admin')}
+            style={{
+              width: '100%', padding: 14, borderRadius: 12, border: '1px solid #1C8A4E', background: '#ffffff',
+              color: '#1C8A4E', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 12,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8
+            }}
+          >
+            ⚙️ {profil?.ist_administrator ? 'Zum Adminbereich' : 'Zur Teamverwaltung'}
+          </button>
+        )}
+
+        {/* ABMELDEN */}
+        <button
+          onClick={abmelden}
+          style={{
+            width: '100%', padding: 14, borderRadius: 12, border: '1px solid #F87171', background: '#FEF2F2',
+            color: '#991B1B', fontWeight: 600, fontSize: 14, cursor: 'pointer', marginBottom: 20
+          }}
+        >
+          🚪 Abmelden
+        </button>
+
+        {/* GEFAHRENZONE: KONTO LÖSCHEN */}
+        <div style={{ border: '1px dashed #F87171', borderRadius: 14, padding: 16 }}>
+          <h3 style={{ fontFamily: 'Sora, sans-serif', fontSize: 13, margin: '0 0 8px', color: '#991B1B' }}>
+            ⚠️ Gefahrenzone
+          </h3>
+          {profil?.loeschung_beantragt ? (
+            <p style={{ fontSize: 13, color: '#5B6D66', margin: 0 }}>
+              Löschantrag wurde bereits übermittelt. Ein Administrator kümmert sich darum.
+            </p>
+          ) : loeschBestaetigenOffen ? (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <p style={{ fontSize: 13, color: '#5B6D66', margin: 0 }}>
+                Bist du sicher? Dein Konto wird dann von einem Administrator dauerhaft gelöscht.
+              </p>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button onClick={kontoLoeschungBeantragen} style={{ background: '#991B1B', color: 'white', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                  Ja, endgültig beantragen
+                </button>
+                <button onClick={() => setLoeschBestaetigenOffen(false)} style={{ background: 'none', border: '1px solid #DCE7E2', borderRadius: 8, padding: '9px 14px', fontSize: 13, cursor: 'pointer' }}>
+                  Abbrechen
+                </button>
+              </div>
+            </div>
+          ) : (
+            <button onClick={() => setLoeschBestaetigenOffen(true)} style={{ background: 'none', border: '1px solid #F87171', color: '#991B1B', borderRadius: 8, padding: '9px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+              Konto-Löschung beantragen
+            </button>
+          )}
+          {loeschMeldung && (
+            <p style={{ fontSize: 12.5, margin: '8px 0 0', color: loeschMeldung.typ === 'error' ? '#c0392b' : '#1C8A4E' }}>{loeschMeldung.text}</p>
+          )}
+        </div>
+      </div>
+
+      <BottomNav session={session} />
+    </div>
+  )
+}
+
+export default Profil
