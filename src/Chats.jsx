@@ -1,4 +1,4 @@
- import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
@@ -90,4 +90,4 @@ function Chats({ session }) {
   )
 }
 
-export default Chats 
+export default Chats
