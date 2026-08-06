@@ -5,18 +5,27 @@ import { supabase } from './supabaseClient'
 export function BottomNav({ istAdmin, session }) {
   const location = useLocation()
   const path = location.pathname
-  const [ungelesen, setUngelesen] = useState(0)
+  const [ungelesenChat, setUngelesenChat] = useState(0)
+  const [ungelesenSpiele, setUngelesenSpiele] = useState(0)
 
   useEffect(() => {
     if (!session?.user?.id) return
 
     const ladeAnzahl = async () => {
-      const { count } = await supabase
+      const { data } = await supabase
         .from('benachrichtigungen')
-        .select('id', { count: 'exact', head: true })
+        .select('typ')
         .eq('benutzer_id', session.user.id)
         .eq('gelesen', false)
-      setUngelesen(count || 0)
+
+      let chat = 0
+      let spiele = 0
+      ;(data || []).forEach(b => {
+        if (b.typ === 'chat') chat += 1
+        else spiele += 1
+      })
+      setUngelesenChat(chat)
+      setUngelesenSpiele(spiele)
     }
     ladeAnzahl()
 
@@ -83,26 +92,24 @@ export function BottomNav({ istAdmin, session }) {
       </Link>
 
       <Link to="/spiele" style={itemStyle(path.startsWith('/spiele'))}>
-        <span style={{ fontSize: 18 }}>📅</span>
+        <span style={{ fontSize: 18, position: 'relative' }}>
+          📅
+          {ungelesenSpiele > 0 && <span style={badgeStyle}>{ungelesenSpiele > 9 ? '9+' : ungelesenSpiele}</span>}
+        </span>
         <span>Spiele</span>
       </Link>
 
       <Link to="/chats" style={itemStyle(path.startsWith('/chat'))}>
-        <span style={{ fontSize: 18 }}>💬</span>
+        <span style={{ fontSize: 18, position: 'relative' }}>
+          💬
+          {ungelesenChat > 0 && <span style={badgeStyle}>{ungelesenChat > 9 ? '9+' : ungelesenChat}</span>}
+        </span>
         <span>Chats</span>
       </Link>
 
       <Link to="/mannschaften" style={itemStyle(path.startsWith('/mannschaften'))}>
         <span style={{ fontSize: 18 }}>👥</span>
         <span>Teams</span>
-      </Link>
-
-      <Link to="/benachrichtigungen" style={itemStyle(path.startsWith('/benachrichtigungen'))}>
-        <span style={{ fontSize: 18, position: 'relative' }}>
-          🔔
-          {ungelesen > 0 && <span style={badgeStyle}>{ungelesen > 9 ? '9+' : ungelesen}</span>}
-        </span>
-        <span>Info</span>
       </Link>
 
       <Link to="/profil" style={itemStyle(path === '/profil' || path === '/admin')}>
@@ -113,4 +120,5 @@ export function BottomNav({ istAdmin, session }) {
   )
 }
 
-export default BottomNav 
+export default BottomNav
+ 
