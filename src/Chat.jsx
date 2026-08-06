@@ -171,7 +171,7 @@ function Chat({ session }) {
         .from('mannschaftszuordnungen')
         .select('rolle')
         .eq('benutzer_id', session.user.id)
-        .in('rolle', ['spielführer', 'stellv_spielführer'])
+        .in('rolle', ['spielfuehrer', 'stellvertreter'])
         .limit(1)
 
       if (!eigeneRolle || eigeneRolle.length === 0) {
