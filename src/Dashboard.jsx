@@ -29,6 +29,12 @@ function Dashboard({ session }) {
   const [istHeuteGeburtstag, setIstHeuteGeburtstag] = useState(false)
   const [geburtstageKameraden, setGeburtstageKameraden] = useState([])
 
+  // Teampinnwand-States
+  const [pinnwandTeams, setPinnwandTeams] = useState([])
+  const [editingTeamId, setEditingTeamId] = useState(null)
+  const [editText, setEditText] = useState('')
+  const [speichertPinnwand, setSpeichertPinnwand] = useState(false)
+
   const berechneTageBisGeburtstag = (geburtsdatumStr) => {
     if (!geburtsdatumStr) return null
     const heute = new Date()
@@ -105,6 +111,40 @@ function Dashboard({ session }) {
 
     geburtstagsListe.sort((a, b) => a.tage - b.tage)
     setGeburtstageKameraden(geburtstagsListe)
+  }
+
+  const ladePinnwand = async (adminStatus) => {
+    const { data: zuordnungen } = await supabase
+      .from('mannschaftszuordnungen')
+      .select('rolle, ist_hauptmannschaft, mannschaften(id, name, dashboard_nachricht, dashboard_nachricht_aktualisiert_am)')
+      .eq('benutzer_id', session.user.id)
+
+    if (!zuordnungen || zuordnungen.length === 0) {
+      setPinnwandTeams([])
+      return
+    }
+
+    const userIsAdmin = adminStatus !== undefined ? adminStatus : istAdmin
+
+    const teams = zuordnungen
+      .map(z => {
+        const m = z.mannschaften
+        if (!m) return null
+        const kannEditieren = ['spielfuehrer', 'stellvertreter'].includes(z.rolle) || userIsAdmin
+        return {
+          id: m.id,
+          name: m.name,
+          nachricht: m.dashboard_nachricht || '',
+          aktualisiertAm: m.dashboard_nachricht_aktualisiert_am,
+          istHauptmannschaft: z.ist_hauptmannschaft,
+          kannEditieren
+        }
+      })
+      .filter(Boolean)
+
+    // Hauptmannschaft nach oben sortieren
+    teams.sort((a, b) => (b.istHauptmannschaft ? 1 : 0) - (a.istHauptmannschaft ? 1 : 0))
+    setPinnwandTeams(teams)
   }
 
   const ladeNaechstesSpiel = async () => {
@@ -206,24 +246,47 @@ function Dashboard({ session }) {
     setBenachrichtigungenAnzahl(count || 0)
   }
 
-  const ladeAlles = () => {
+  const ladeAlles = (adminStatus) => {
     ladeNaechstesSpiel()
     ladeOffeneSpiele()
     ladeErsatzanfragen()
     ladeBenachrichtigungen()
     ladeGeburtstage()
+    ladePinnwand(adminStatus)
   }
 
   useEffect(() => {
     supabase.from('benutzer').select('vorname, ist_administrator').eq('id', session.user.id).single()
       .then(({ data }) => {
+        const adminVal = data?.ist_administrator || false
         if (data) {
           setVorname(data.vorname)
-          setIstAdmin(data.ist_administrator)
+          setIstAdmin(adminVal)
         }
+        ladeAlles(adminVal)
       })
-    ladeAlles()
   }, [session])
+
+  const pinnwandSpeichern = async (teamId) => {
+    setSpeichertPinnwand(true)
+    const now = new Date().toISOString()
+
+    const { error } = await supabase
+      .from('mannschaften')
+      .update({
+        dashboard_nachricht: editText,
+        dashboard_nachricht_aktualisiert_am: now
+      })
+      .eq('id', teamId)
+
+    if (error) {
+      alert('Fehler beim Speichern der Nachricht: ' + error.message)
+    } else {
+      setPinnwandTeams(prev => prev.map(t => t.id === teamId ? { ...t, nachricht: editText, aktualisiertAm: now } : t))
+      setEditingTeamId(null)
+    }
+    setSpeichertPinnwand(false)
+  }
 
   const zusageSetzen = async (spielId, status) => {
     await supabase.from('verfuegbarkeiten').upsert(
@@ -269,6 +332,12 @@ function Dashboard({ session }) {
       return datum.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
     }
     return datum.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+  }
+
+  const formatDatumZeit = (iso) => {
+    if (!iso) return ''
+    const d = new Date(iso)
+    return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' }) + ' um ' + d.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr'
   }
 
   const offeneOhneNaechstes = offeneSpiele.filter(s => s.id !== naechstesSpiel?.id)
@@ -335,6 +404,111 @@ function Dashboard({ session }) {
                 </div>
               ))}
             </div>
+          </div>
+        )}
+
+        {/* TEAMPINNWAND / DASHBOARD-NACHRICHT */}
+        {pinnwandTeams.length > 0 && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+            {pinnwandTeams.map(team => (
+              <div
+                key={team.id}
+                style={{
+                  background: '#ffffff',
+                  border: '1px solid #DCE7E2',
+                  borderRadius: 16,
+                  padding: '16px'
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+                  <div style={{
+                    fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700,
+                    letterSpacing: '.06em', textTransform: 'uppercase', color: '#1C8A4E'
+                  }}>
+                    📌 Pinnwand · {team.name}
+                  </div>
+                  {team.kannEditieren && editingTeamId !== team.id && (
+                    <button
+                      onClick={() => {
+                        setEditingTeamId(team.id)
+                        setEditText(team.nachricht || '')
+                      }}
+                      style={{
+                        background: 'none', border: 'none', color: '#1C8A4E',
+                        fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0
+                      }}
+                    >
+                      ✏️ Bearbeiten
+                    </button>
+                  )}
+                </div>
+
+                {editingTeamId === team.id ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 8 }}>
+                    <textarea
+                      value={editText}
+                      onChange={(e) => setEditText(e.target.value)}
+                      placeholder="Wichtige Infos für das Team (z.B. Treffpunkt, Hallenöffnung, Fahrgemeinschaften)..."
+                      rows={3}
+                      style={{
+                        width: '100%',
+                        boxSizing: 'border-box',
+                        padding: '10px 12px',
+                        borderRadius: 10,
+                        border: '1px solid #DCE7E2',
+                        fontSize: 13.5,
+                        fontFamily: 'Inter, sans-serif',
+                        resize: 'vertical',
+                        outline: 'none'
+                      }}
+                    />
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                      <button
+                        onClick={() => setEditingTeamId(null)}
+                        disabled={speichertPinnwand}
+                        style={{
+                          ...smallButtonStyle,
+                          background: 'transparent',
+                          borderColor: '#DCE7E2',
+                          color: '#5B6D66'
+                        }}
+                      >
+                        Abbrechen
+                      </button>
+                      <button
+                        onClick={() => pinnwandSpeichern(team.id)}
+                        disabled={speichertPinnwand}
+                        style={{
+                          ...smallButtonStyle,
+                          background: '#1C8A4E',
+                          borderColor: '#1C8A4E',
+                          color: 'white'
+                        }}
+                      >
+                        {speichertPinnwand ? 'Speichert...' : 'Speichern'}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    {team.nachricht ? (
+                      <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.5, color: '#16261F', whiteSpace: 'pre-wrap' }}>
+                        {team.nachricht}
+                      </p>
+                    ) : (
+                      <p style={{ margin: 0, fontSize: 13, color: '#8A9A93', fontStyle: 'italic' }}>
+                        Keine aktuelle Pinnwand-Nachricht vorhanden.
+                      </p>
+                    )}
+                    {team.aktualisiertAm && (
+                      <div style={{ fontSize: 11, color: '#8A9A93', textAlign: 'right', marginTop: 8 }}>
+                        Stand: {formatDatumZeit(team.aktualisiertAm)}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ))}
           </div>
         )}
 
@@ -559,4 +733,3 @@ function Dashboard({ session }) {
 }
 
 export default Dashboard
- 
