@@ -8,7 +8,7 @@ const EMOJIS = ['😀','😂','👍','🙏','🏓','🔥','😉','😢','🎉','
 
 function Chat({ session }) {
   const { mannschaftId, spielId } = useParams()
-  const typ = mannschaftId ? 'mannschaft' : 'spiel'
+  const typ = mannschaftId ? 'mannschaft' : spielId ? 'spiel' : 'spielfuehrer'
   const [istAdmin, setIstAdmin] = useState(false)
   const [titel, setTitel] = useState('')
   const [chatId, setChatId] = useState(null)
@@ -31,28 +31,25 @@ function Chat({ session }) {
   const listeEndeRef = useRef(null)
   const scrollZielRef = useRef(null)
   const textInputRef = useRef(null)
+  const namenLexikonRef = useRef({})
 
   const renderNachrichtText = (text) => {
     const parts = []
     let lastIdx = 0
     
-    // Regex für @Mentions: @ gefolgt von Buchstaben, Zahlen, Umlauten und Spaces (für Vor- und Nachnamen)
     const regex = /@([\w\sÄÖÜäöüß]+?)(?=\s|$|[.,!?:;])/g
     let match
     
     while ((match = regex.exec(text)) !== null) {
-      // Text vor der Mention hinzufügen
       if (match.index > lastIdx) {
         parts.push(text.substring(lastIdx, match.index))
       }
       
       const erwaehnterName = match[1].trim()
-      // Prüfen ob der Name im Lexikon existiert (case-insensitive)
       const istGueltigeMention = Object.values(namenLexikon).some(name =>
         name.toLowerCase().includes(erwaehnterName.toLowerCase())
       )
       
-      // Mention rendern
       parts.push(
         <span key={`mention-${match.index}`} style={{
           color: istGueltigeMention ? '#1C8A4E' : '#667781',
@@ -68,7 +65,6 @@ function Chat({ session }) {
       lastIdx = regex.lastIndex
     }
     
-    // Restlicher Text
     if (lastIdx < text.length) {
       parts.push(text.substring(lastIdx))
     }
@@ -76,75 +72,66 @@ function Chat({ session }) {
     return parts.length > 0 ? parts : text
   }
 
-  const nachrichtenLaden = async (cId) => {
-    const { data: namen } = await supabase.rpc('teamkollegen_namen')
+  const initialLaden = async (cId) => {
+    const namenQuery = typ === 'spielfuehrer' ? supabase.rpc('spielfuehrer_namen') : supabase.rpc('teamkollegen_namen')
+
+    const [{ data: namen }, { data: nachrichtenData }] = await Promise.all([
+      namenQuery,
+      supabase
+        .from('nachrichten')
+        .select('id, benutzer_id, text, gesendet_am, medien_url, standort_lat, standort_lng')
+        .eq('chat_id', cId)
+        .order('gesendet_am')
+    ])
+
     const lex = Object.fromEntries((namen || []).map(n => [n.id, `${n.vorname} ${n.nachname}`]))
     setNamenLexikon(lex)
+    namenLexikonRef.current = lex
 
-    const { data } = await supabase
-      .from('nachrichten')
-      .select('id, benutzer_id, text, gesendet_am, medien_url, standort_lat, standort_lng')
-      .eq('chat_id', cId)
-      .order('gesendet_am')
+    const data = nachrichtenData || []
+    setNachrichten(data.map(n => ({ ...n, name: lex[n.benutzer_id] || (n.benutzer_id === session.user.id ? 'Du' : '?') })))
 
-    setNachrichten((data || []).map(n => ({ ...n, name: lex[n.benutzer_id] || (n.benutzer_id === session.user.id ? 'Du' : '?') })))
+    const alleIds = data.map(n => n.id)
+    if (alleIds.length === 0) { setLadend(false); return }
 
-    // Ermittle erste ungelesene Nachricht BEVOR alles als gelesen markiert wird
-    const empfangeneIds = (data || []).filter(n => n.benutzer_id !== session.user.id).map(n => n.id)
-    
-    if (empfangeneIds.length > 0) {
-      // Prüfe welche bereits gelesen sind
-      const { data: bereitsGelesen } = await supabase
-        .from('nachrichten_gelesen')
-        .select('nachricht_id')
-        .eq('benutzer_id', session.user.id)
-        .in('nachricht_id', empfangeneIds)
-      
-      const gelesenSet = new Set((bereitsGelesen || []).map(g => g.nachricht_id))
-      
-      // Finde erste ungelesene
-      const ersteUngelesene = (data || []).find(n =>
-        n.benutzer_id !== session.user.id && !gelesenSet.has(n.id)
-      )
-      
-      if (ersteUngelesene) {
-        setScrollZuNachrichtId(ersteUngelesene.id)
-      } else {
-        // Wenn alles gelesen, scroll ans Ende
-        setScrollZuNachrichtId(null)
-      }
+    const { data: gelesenRows } = await supabase
+      .from('nachrichten_gelesen')
+      .select('nachricht_id, benutzer_id, gelesen_am')
+      .in('nachricht_id', alleIds)
 
-      // Markiere alle als gelesen
+    const gelesenSet = new Set(
+      (gelesenRows || []).filter(g => g.benutzer_id === session.user.id).map(g => g.nachricht_id)
+    )
+
+    const empfangeneIds = data.filter(n => n.benutzer_id !== session.user.id).map(n => n.id)
+    const ersteUngelesene = data.find(n => n.benutzer_id !== session.user.id && !gelesenSet.has(n.id))
+    setScrollZuNachrichtId(ersteUngelesene ? ersteUngelesene.id : null)
+
+    const map = {}
+    ;(gelesenRows || []).forEach(g => {
+      if (!map[g.nachricht_id]) map[g.nachricht_id] = []
+      map[g.nachricht_id].push(g)
+    })
+    setGelesenMap(map)
+
+    const nochNichtGelesen = empfangeneIds.filter(id => !gelesenSet.has(id))
+    if (nochNichtGelesen.length > 0) {
       await supabase.from('nachrichten_gelesen')
         .upsert(
-          empfangeneIds.map(nachricht_id => ({ nachricht_id, benutzer_id: session.user.id })),
+          nochNichtGelesen.map(nachricht_id => ({ nachricht_id, benutzer_id: session.user.id })),
           { onConflict: 'nachricht_id,benutzer_id', ignoreDuplicates: true }
         )
-    }
-
-    // Lade Lesebestätigungen für eigene Nachrichten
-    const eigeneIds = (data || []).filter(n => n.benutzer_id === session.user.id).map(n => n.id)
-    if (eigeneIds.length > 0) {
-      const { data: gelesenRows } = await supabase
-        .from('nachrichten_gelesen')
-        .select('nachricht_id, benutzer_id, gelesen_am')
-        .in('nachricht_id', eigeneIds)
-      const map = {}
-      ;(gelesenRows || []).forEach(g => {
-        if (!map[g.nachricht_id]) map[g.nachricht_id] = []
-        map[g.nachricht_id].push(g)
-      })
-      setGelesenMap(map)
     }
   }
 
   const initialisieren = async () => {
     setLadend(true)
 
-    const { data: benutzerRow } = await supabase.from('benutzer').select('ist_administrator').eq('id', session.user.id).single()
+    const { data: benutzerRow } = await supabase.from('benutzer').select('ist_administrator, verein_id').eq('id', session.user.id).single()
     setIstAdmin(benutzerRow?.ist_administrator || false)
 
     let bestehenderChat = null
+
     if (typ === 'mannschaft') {
       const { data: m } = await supabase.from('mannschaften').select('name').eq('id', mannschaftId).single()
       setTitel(m?.name || 'Teamchat')
@@ -152,7 +139,8 @@ function Chat({ session }) {
       setTeilnehmerIds((mitglieder || []).map(z => z.benutzer_id).filter(id => id !== session.user.id))
       const { data } = await supabase.from('chats').select('id').eq('typ', 'mannschaft').eq('mannschaft_id', mannschaftId).maybeSingle()
       bestehenderChat = data
-    } else {
+
+    } else if (typ === 'spiel') {
       const { data: s } = await supabase.from('spiele').select('gegner, heim_oder_auswaerts, mannschaften(name)').eq('id', spielId).single()
       if (s) {
         setTitel(s.heim_oder_auswaerts === 'heim' ? `${s.mannschaften?.name} vs. ${s.gegner}` : `${s.gegner} vs. ${s.mannschaften?.name}`)
@@ -174,10 +162,42 @@ function Chat({ session }) {
 
       const { data } = await supabase.from('chats').select('id').eq('typ', 'spiel').eq('spiel_id', spielId).maybeSingle()
       bestehenderChat = data
+
+    } else {
+      // Vereinsweiter Spielführer-Chat
+      setTitel('Spielführer-Chat')
+
+      const { data: eigeneRolle } = await supabase
+        .from('mannschaftszuordnungen')
+        .select('rolle')
+        .eq('benutzer_id', session.user.id)
+        .in('rolle', ['spielführer', 'stellv_spielführer'])
+        .limit(1)
+
+      if (!eigeneRolle || eigeneRolle.length === 0) {
+        setKeinZugriff(true)
+        setLadend(false)
+        return
+      }
+
+      const vereinId = benutzerRow?.verein_id
+      const { data } = await supabase.from('chats').select('id').eq('typ', 'spielfuehrer').eq('verein_id', vereinId).maybeSingle()
+      bestehenderChat = data
+
+      if (!bestehenderChat) {
+        const { data: neu, error } = await supabase.from('chats').insert({ typ: 'spielfuehrer', verein_id: vereinId }).select().single()
+        if (error) {
+          const { data: nochmal } = await supabase.from('chats').select('id').eq('typ', 'spielfuehrer').eq('verein_id', vereinId).maybeSingle()
+          bestehenderChat = nochmal
+          if (!bestehenderChat) { setFehler(error.message); setLadend(false); return }
+        } else {
+          bestehenderChat = neu
+        }
+      }
     }
 
     let cId = bestehenderChat?.id
-    if (!cId) {
+    if (!cId && typ !== 'spielfuehrer') {
       const insertPayload = typ === 'mannschaft'
         ? { typ: 'mannschaft', mannschaft_id: mannschaftId }
         : { typ: 'spiel', spiel_id: spielId }
@@ -194,7 +214,7 @@ function Chat({ session }) {
     }
 
     setChatId(cId)
-    await nachrichtenLaden(cId)
+    await initialLaden(cId)
     setLadend(false)
   }
 
@@ -202,16 +222,44 @@ function Chat({ session }) {
 
   useEffect(() => {
     if (!chatId) return
-    const intervall = setInterval(() => nachrichtenLaden(chatId), 5000)
-    return () => clearInterval(intervall)
-  }, [chatId])
 
-  // Scroll zur ersten ungelesenen Nachricht oder ans Ende
-  // "ladend" ist hier bewusst mit als Abhängigkeit gelistet: die Nachrichten
-  // werden schon geladen, während noch "Lade Chat..." angezeigt wird (die
-  // Ziel-Nachricht existiert im DOM also noch nicht). Erst wenn ladend auf
-  // false wechselt, ist die Liste tatsächlich gerendert und die Refs sind
-  // gesetzt - ohne diese Abhängigkeit würde der Effekt dann nicht erneut laufen.
+    const channel = supabase
+      .channel(`chat-${chatId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'nachrichten', filter: `chat_id=eq.${chatId}` },
+        async (payload) => {
+          const neue = payload.new
+          const name = neue.benutzer_id === session.user.id ? 'Du' : (namenLexikonRef.current[neue.benutzer_id] || '?')
+
+          setNachrichten(prev => prev.some(n => n.id === neue.id) ? prev : [...prev, { ...neue, name }])
+          setScrollZuNachrichtId(null)
+
+          if (neue.benutzer_id !== session.user.id) {
+            await supabase.from('nachrichten_gelesen').upsert(
+              { nachricht_id: neue.id, benutzer_id: session.user.id },
+              { onConflict: 'nachricht_id,benutzer_id', ignoreDuplicates: true }
+            )
+          }
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'nachrichten_gelesen' },
+        (payload) => {
+          const g = payload.new
+          setGelesenMap(prev => {
+            const bestehend = prev[g.nachricht_id] || []
+            if (bestehend.some(e => e.benutzer_id === g.benutzer_id)) return prev
+            return { ...prev, [g.nachricht_id]: [...bestehend, g] }
+          })
+        }
+      )
+      .subscribe()
+
+    return () => supabase.removeChannel(channel)
+  }, [chatId, session.user.id])
+
   useEffect(() => {
     if (ladend) return
     if (scrollZuNachrichtId && scrollZielRef.current) {
@@ -229,8 +277,7 @@ function Chat({ session }) {
     const inhalt = text.trim()
     setText('')
     const { error } = await supabase.from('nachrichten').insert({ chat_id: chatId, benutzer_id: session.user.id, text: inhalt })
-    if (error) { setFehler(error.message); return }
-    nachrichtenLaden(chatId)
+    if (error) setFehler(error.message)
   }
 
   const emojiEinfuegen = (emoji) => {
@@ -243,7 +290,6 @@ function Chat({ session }) {
     const cursorPos = e.target.selectionStart
     setText(neuerText)
 
-    // Suche nach @ vor der Cursor-Position (ohne Leerzeichen dazwischen)
     const textVorCursor = neuerText.substring(0, cursorPos)
     const atMatch = textVorCursor.match(/@([\wÄÖÜäöüß]*)$/)
 
@@ -281,7 +327,6 @@ function Chat({ session }) {
     const { data: urlData } = supabase.storage.from('chat-medien').getPublicUrl(dateiPfad)
     await supabase.from('nachrichten').insert({ chat_id: chatId, benutzer_id: session.user.id, text: '📷 Foto', medien_url: urlData.publicUrl })
     setMedienHochladend(false)
-    nachrichtenLaden(chatId)
   }
 
   const standortSenden = () => {
@@ -292,7 +337,6 @@ function Chat({ session }) {
         chat_id: chatId, benutzer_id: session.user.id, text: '📍 Standort',
         standort_lat: pos.coords.latitude, standort_lng: pos.coords.longitude
       })
-      nachrichtenLaden(chatId)
     }, () => setFehler('Standort konnte nicht ermittelt werden.'))
   }
 
@@ -307,7 +351,7 @@ function Chat({ session }) {
   if (keinZugriff) {
     return (
       <div style={{ height: '100vh', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#efeae2', fontFamily: 'Inter, sans-serif', color: '#16261F', padding: 24, textAlign: 'center', gap: 12 }}>
-        <p>Dieser Spielchat ist nur für die aufgestellten Spieler sichtbar.</p>
+        <p>{typ === 'spielfuehrer' ? 'Dieser Chat ist nur für Spielführer und stellvertretende Spielführer sichtbar.' : 'Dieser Spielchat ist nur für die aufgestellten Spieler sichtbar.'}</p>
         <Link to="/chats" style={{ color: '#1C8A4E', fontWeight: 600 }}>← Zurück zu Chats</Link>
       </div>
     )
