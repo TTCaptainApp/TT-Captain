@@ -1,4 +1,4 @@
- import { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
@@ -8,6 +8,7 @@ const cardStyle = { background: '#ffffff', border: '1px solid #DCE7E2', borderRa
 
 function Chats({ session }) {
   const [istAdmin, setIstAdmin] = useState(false)
+  const [istSpielfuehrer, setIstSpielfuehrer] = useState(false)
   const [teamChats, setTeamChats] = useState([])
   const [spielChats, setSpielChats] = useState([])
   const [ladend, setLadend] = useState(true)
@@ -19,12 +20,13 @@ function Chats({ session }) {
 
       const { data: zuordnungen } = await supabase
         .from('mannschaftszuordnungen')
-        .select('mannschaft_id, mannschaften(name, archiviert)')
+        .select('mannschaft_id, rolle, mannschaften(name, archiviert)')
         .eq('benutzer_id', session.user.id)
       const teams = (zuordnungen || [])
         .filter(z => z.mannschaften && !z.mannschaften.archiviert)
         .map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
       setTeamChats(teams)
+      setIstSpielfuehrer((zuordnungen || []).some(z => z.rolle === 'spielführer' || z.rolle === 'stellv_spielführer'))
 
       const { data: teilnahmen } = await supabase
         .from('aufstellung_spieler')
@@ -46,6 +48,14 @@ function Chats({ session }) {
       }
       setSpielChats(spielChatsListe)
       setLadend(false)
+
+      // Badge beim Öffnen der Chat-Übersicht leeren
+      supabase.from('benachrichtigungen')
+        .update({ gelesen: true })
+        .eq('benutzer_id', session.user.id)
+        .eq('typ', 'chat')
+        .eq('gelesen', false)
+        .then(() => {})
     }
     laden()
   }, [session])
@@ -61,7 +71,20 @@ function Chats({ session }) {
       <div style={{ padding: '20px 20px 80px', maxWidth: 480, margin: '0 auto' }}>
         <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 20, margin: '8px 0 16px' }}>Chats</h1>
 
-        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5B6D66', textTransform: 'uppercase', letterSpacing: '.04em', margin: '4px 0 8px' }}>
+        {istSpielfuehrer && (
+          <>
+            <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5B6D66', textTransform: 'uppercase', letterSpacing: '.04em', margin: '4px 0 8px' }}>
+              Spielführer
+            </div>
+            <Link to="/chats/spielfuehrer" style={{ textDecoration: 'none', color: 'inherit' }}>
+              <div style={{ ...cardStyle, border: '1px solid #23D2A0' }}>
+                <span style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 14 }}>🏅 Spielführer-Chat</span>
+              </div>
+            </Link>
+          </>
+        )}
+
+        <div style={{ fontSize: 12.5, fontWeight: 700, color: '#5B6D66', textTransform: 'uppercase', letterSpacing: '.04em', margin: '16px 0 8px' }}>
           Teamchats
         </div>
         {teamChats.map(t => (
