@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
 import BottomNav from './BottomNav'
@@ -9,8 +10,10 @@ const smallButtonStyle = {
 }
 
 const ANZAHL_SICHTBAR = 2
+const BENACHRICHTIGUNGEN_SICHTBAR = 4
 
 function Dashboard({ session }) {
+  const navigate = useNavigate()
   const [vorname, setVorname] = useState('')
   const [istAdmin, setIstAdmin] = useState(false)
   const [offeneSpiele, setOffeneSpiele] = useState([])
@@ -19,6 +22,8 @@ function Dashboard({ session }) {
   const [naechstesSpiel, setNaechstesSpiel] = useState(null)
   const [naechsteVerfuegbarkeit, setNaechsteVerfuegbarkeit] = useState(null)
   const [naechsteAufstellung, setNaechsteAufstellung] = useState(null)
+  const [benachrichtigungen, setBenachrichtigungen] = useState([])
+  const [benachrichtigungenAnzahl, setBenachrichtigungenAnzahl] = useState(0)
 
   const ladeNaechstesSpiel = async () => {
     const { data: zuordnungen } = await supabase
@@ -107,10 +112,23 @@ function Dashboard({ session }) {
     setErsatzanfragen(data || [])
   }
 
+  const ladeBenachrichtigungen = async () => {
+    const { data, count } = await supabase
+      .from('benachrichtigungen')
+      .select('id, typ, titel, nachricht, link, erstellt_am', { count: 'exact' })
+      .eq('benutzer_id', session.user.id)
+      .eq('gelesen', false)
+      .order('erstellt_am', { ascending: false })
+      .limit(BENACHRICHTIGUNGEN_SICHTBAR)
+    setBenachrichtigungen(data || [])
+    setBenachrichtigungenAnzahl(count || 0)
+  }
+
   const ladeAlles = () => {
     ladeNaechstesSpiel()
     ladeOffeneSpiele()
     ladeErsatzanfragen()
+    ladeBenachrichtigungen()
   }
 
   useEffect(() => {
@@ -146,6 +164,30 @@ function Dashboard({ session }) {
     ladeAlles()
   }
 
+  const benachrichtigungOeffnen = async (b) => {
+    await supabase.from('benachrichtigungen').update({ gelesen: true }).eq('id', b.id)
+    ladeBenachrichtigungen()
+    if (b.link) navigate(b.link)
+  }
+
+  const alleBenachrichtigungenGelesen = async () => {
+    await supabase.from('benachrichtigungen')
+      .update({ gelesen: true })
+      .eq('benutzer_id', session.user.id)
+      .eq('gelesen', false)
+    ladeBenachrichtigungen()
+  }
+
+  const zeitKurz = (iso) => {
+    const datum = new Date(iso)
+    const heute = new Date()
+    const istHeute = datum.toDateString() === heute.toDateString()
+    if (istHeute) {
+      return datum.toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })
+    }
+    return datum.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
+  }
+
   // Das nächste Spiel wird oben separat gezeigt, daher aus der
   // "Offene Rückmeldungen"-Liste herausfiltern (keine Dopplung)
   const offeneOhneNaechstes = offeneSpiele.filter(s => s.id !== naechstesSpiel?.id)
@@ -165,6 +207,52 @@ function Dashboard({ session }) {
         <p style={{ color: '#5B6D66', fontSize: 14, marginBottom: 20 }}>
           Schön, dass du dabei bist.
         </p>
+
+        {benachrichtigungen.length > 0 && (
+          <div style={{
+            background: '#ffffff', border: '2px solid #2E6FE0', borderRadius: 16,
+            padding: '18px 16px', marginBottom: 16
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+              <div style={{
+                fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700,
+                letterSpacing: '.06em', textTransform: 'uppercase', color: '#2E6FE0'
+              }}>
+                🔔 Neu ({benachrichtigungenAnzahl})
+              </div>
+              <button
+                onClick={alleBenachrichtigungenGelesen}
+                style={{ background: 'none', border: 'none', color: '#5B6D66', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}
+              >
+                Alle gelesen
+              </button>
+            </div>
+
+            {benachrichtigungen.map(b => (
+              <div
+                key={b.id}
+                onClick={() => benachrichtigungOeffnen(b)}
+                style={{ padding: '9px 0', borderTop: '1px solid #DCE7E2', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', gap: 10 }}
+              >
+                <div>
+                  <div style={{ fontSize: 13.5, fontWeight: 600 }}>{b.titel}</div>
+                  {b.nachricht && (
+                    <div style={{ fontSize: 12.5, color: '#5B6D66', marginTop: 2 }}>{b.nachricht}</div>
+                  )}
+                </div>
+                <div style={{ fontSize: 11, color: '#8A9A93', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                  {zeitKurz(b.erstellt_am)}
+                </div>
+              </div>
+            ))}
+
+            {benachrichtigungenAnzahl > benachrichtigungen.length && (
+              <div style={{ fontSize: 12, color: '#5B6D66', marginTop: 8 }}>
+                + {benachrichtigungenAnzahl - benachrichtigungen.length} weitere
+              </div>
+            )}
+          </div>
+        )}
 
         {naechstesSpiel && (
           <div style={{
