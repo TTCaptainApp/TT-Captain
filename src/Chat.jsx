@@ -207,15 +207,21 @@ function Chat({ session }) {
   }, [chatId])
 
   // Scroll zur ersten ungelesenen Nachricht oder ans Ende
+  // "ladend" ist hier bewusst mit als Abhängigkeit gelistet: die Nachrichten
+  // werden schon geladen, während noch "Lade Chat..." angezeigt wird (die
+  // Ziel-Nachricht existiert im DOM also noch nicht). Erst wenn ladend auf
+  // false wechselt, ist die Liste tatsächlich gerendert und die Refs sind
+  // gesetzt - ohne diese Abhängigkeit würde der Effekt dann nicht erneut laufen.
   useEffect(() => {
+    if (ladend) return
     if (scrollZuNachrichtId && scrollZielRef.current) {
       setTimeout(() => {
         scrollZielRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }, 50)
     } else if (!scrollZuNachrichtId) {
-      listeEndeRef.current?.scrollIntoView({ behavior: 'smooth' })
+      listeEndeRef.current?.scrollIntoView({ behavior: 'auto' })
     }
-  }, [nachrichten, scrollZuNachrichtId])
+  }, [nachrichten, scrollZuNachrichtId, ladend])
 
   const senden = async (e) => {
     e.preventDefault()
@@ -517,4 +523,4 @@ function Chat({ session }) {
   )
 }
 
-export default Chat 
+export default Chat
