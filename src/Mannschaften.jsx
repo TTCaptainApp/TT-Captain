@@ -3,11 +3,26 @@ import { supabase } from './supabaseClient'
 import Brand from './Brand'
 import BottomNav from './BottomNav'
 
-const cardStyle = { background: '#ffffff', border: '1px solid #DCE7E2', borderRadius: 14, padding: 16, marginBottom: 12 }
-const inputStyle = { padding: '9px 10px', fontSize: 14, borderRadius: 8, border: '1px solid #DCE7E2', fontFamily: 'inherit', flex: 1 }
-const buttonStyle = { background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 8, padding: '9px 14px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }
-const smallButtonStyle = { ...buttonStyle, padding: '6px 10px', fontSize: 12.5 }
-const outlineSmallButtonStyle = { ...smallButtonStyle, background: 'transparent', color: '#1C8A4E', border: '1px solid #1C8A4E' }
+// ── Design-Tokens (konsistent mit Spiele.jsx / Dashboard.jsx) ───
+const C = {
+  courtGreen: '#1C8A4E',
+  mint: '#EAF6F0',
+  bg: '#F6FAF8',
+  ink: '#16261F',
+  inkMuted: '#5B6D66',
+  border: '#DCE7E2',
+  danger: '#C0392B',
+  white: '#FFFFFF'
+}
+const fontDisplay = 'Sora, sans-serif'
+const fontBody = 'Inter, sans-serif'
+const fontMono = "'JetBrains Mono', monospace"
+
+const cardStyle = { background: C.white, border: `1px solid ${C.border}`, borderRadius: 16, padding: 16, marginBottom: 14, boxShadow: '0 1px 2px rgba(22,38,31,0.04)' }
+const inputStyle = { padding: '10px 12px', fontSize: 15, borderRadius: 10, border: `1px solid ${C.border}`, fontFamily: fontBody, flex: 1, boxSizing: 'border-box' }
+const buttonStyle = { background: C.courtGreen, color: C.white, border: 'none', borderRadius: 10, minHeight: 44, padding: '0 16px', fontSize: 14.5, fontWeight: 700, cursor: 'pointer', fontFamily: fontBody }
+const chipButtonStyle = { minHeight: 40, padding: '0 14px', fontSize: 13.5, fontWeight: 700, borderRadius: 10, cursor: 'pointer', border: `1.5px solid ${C.border}`, background: C.white, color: C.ink, fontFamily: fontBody }
+const outlineChipStyle = { ...chipButtonStyle, border: `1.5px solid ${C.courtGreen}`, color: C.courtGreen }
 
 const KADER_VORSCHAU_ANZAHL = 4
 
@@ -20,7 +35,6 @@ function Mannschaften({ session }) {
   const [fehler, setFehler] = useState(null)
   const [kopiert, setKopiert] = useState(null)
 
-  // Kaderverwaltung
   const [meineRollen, setMeineRollen] = useState({})
   const [kader, setKader] = useState({})
   const [kaderOffen, setKaderOffen] = useState({})
@@ -150,19 +164,19 @@ function Mannschaften({ session }) {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: '#F6FAF8', fontFamily: 'Inter, sans-serif', color: '#16261F' }}>
-      <div style={{ padding: '18px 20px', borderBottom: '1px solid #DCE7E2', background: '#ffffff' }}>
+    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: fontBody, color: C.ink }}>
+      <div style={{ padding: '18px 20px', borderBottom: `1px solid ${C.border}`, background: C.white }}>
         <Brand size={16} />
       </div>
 
-      <div style={{ padding: '20px 20px 80px', maxWidth: 480, margin: '0 auto' }}>
-        <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 20, margin: '8px 0 16px' }}>Mannschaften</h1>
+      <div style={{ padding: '20px 16px 88px', maxWidth: 480, margin: '0 auto' }}>
+        <h1 style={{ fontFamily: fontDisplay, fontWeight: 700, fontSize: 21, margin: '8px 0 16px' }}>Mannschaften</h1>
 
         <form onSubmit={neueMannschaftAnlegen} style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
           <input style={inputStyle} placeholder="Name neue Mannschaft (z.B. Herren 1)" value={neuerName} onChange={e => setNeuerName(e.target.value)} />
           <button type="submit" style={buttonStyle}>Anlegen</button>
         </form>
-        {fehler && <p style={{ color: '#c0392b', fontSize: 13 }}>{fehler}</p>}
+        {fehler && <p style={{ color: C.danger, fontSize: 13 }}>{fehler}</p>}
 
         {mannschaften.map(m => {
           const kaderListe = kader[m.id] || []
@@ -172,30 +186,30 @@ function Mannschaften({ session }) {
 
           return (
             <div key={m.id} style={cardStyle}>
-              <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 15, marginBottom: 8 }}>{m.name}</div>
+              <div style={{ fontFamily: fontDisplay, fontWeight: 700, fontSize: 15.5, marginBottom: 10 }}>{m.name}</div>
 
               <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                <button style={smallButtonStyle} onClick={() => einladungslinkErzeugen(m.id)}>+ Einladungslink erzeugen</button>
+                <button style={chipButtonStyle} onClick={() => einladungslinkErzeugen(m.id)}>+ Einladungslink</button>
 
                 {links[m.id] === undefined && (
-                  <button style={outlineSmallButtonStyle} onClick={() => ladeLinks(m.id)}>
+                  <button style={outlineChipStyle} onClick={() => ladeLinks(m.id)}>
                     Links anzeigen
                   </button>
                 )}
 
-                <button style={outlineSmallButtonStyle} onClick={() => kaderTogglen(m.id)}>
+                <button style={outlineChipStyle} onClick={() => kaderTogglen(m.id)}>
                   {kaderOffen[m.id] ? '👥 Kader ausblenden' : '👥 Kader anzeigen'}
                 </button>
               </div>
 
               {(links[m.id] || []).map(l => (
-                <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, fontSize: 13 }}>
-                  <span style={{ fontFamily: 'JetBrains Mono, monospace', color: l.aktiv ? '#16261F' : '#5B6D66' }}>
+                <div key={l.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, fontSize: 13, minHeight: 32 }}>
+                  <span style={{ fontFamily: fontMono, color: l.aktiv ? C.ink : C.inkMuted }}>
                     {l.code} {!l.aktiv && '(inaktiv)'}
                   </span>
                   <button
                     onClick={() => linkKopieren(l.code)}
-                    style={{ background: 'none', border: 'none', color: '#1C8A4E', cursor: 'pointer', fontSize: 12.5, fontWeight: 600 }}
+                    style={{ background: 'none', border: 'none', color: C.courtGreen, cursor: 'pointer', fontSize: 13, fontWeight: 700, minHeight: 32 }}
                   >
                     {kopiert === l.code ? '✅ kopiert' : '🔗 Link kopieren'}
                   </button>
@@ -203,19 +217,19 @@ function Mannschaften({ session }) {
               ))}
 
               {kaderOffen[m.id] && (
-                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #DCE7E2' }}>
+                <div style={{ marginTop: 14, paddingTop: 14, borderTop: `1px solid ${C.border}` }}>
                   {kaderListe.length === 0 ? (
-                    <p style={{ fontSize: 13, color: '#5B6D66', margin: 0 }}>Noch keine Spieler zugeordnet.</p>
+                    <p style={{ fontSize: 13, color: C.inkMuted, margin: 0 }}>Noch keine Spieler zugeordnet.</p>
                   ) : (
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                       {sichtbareListe.map(mitglied => (
                         <div key={mitglied.id} style={{
                           display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                          padding: '9px 10px', background: '#F6FAF8', border: '1px solid #DCE7E2', borderRadius: 10
+                          padding: '10px 12px', background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, minHeight: 48
                         }}>
                           <div>
-                            <div style={{ fontWeight: 600, fontSize: 13 }}>{mitglied.vorname} {mitglied.nachname}</div>
-                            <div style={{ fontSize: 11.5, color: '#5B6D66' }}>{getRolleLabel(mitglied.rolle)}</div>
+                            <div style={{ fontWeight: 600, fontSize: 13.5 }}>{mitglied.vorname} {mitglied.nachname}</div>
+                            <div style={{ fontSize: 11.5, color: C.inkMuted }}>{getRolleLabel(mitglied.rolle)}</div>
                           </div>
 
                           {qttrBearbeitenId === mitglied.id ? (
@@ -227,29 +241,29 @@ function Mannschaften({ session }) {
                                 max="3000"
                                 value={qttrEingabe}
                                 onChange={e => setQttrEingabe(e.target.value)}
-                                style={{ width: 64, padding: '6px 8px', borderRadius: 6, border: '1px solid #DCE7E2', fontSize: 13 }}
+                                style={{ width: 66, minHeight: 36, padding: '4px 8px', borderRadius: 8, border: `1px solid ${C.border}`, fontSize: 13.5, boxSizing: 'border-box' }}
                               />
                               <button
                                 onClick={() => qttrSpeichern(m.id, mitglied.id)}
                                 disabled={qttrSpeichernLaeuft}
-                                style={{ background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 6, padding: '6px 9px', fontSize: 12, cursor: 'pointer' }}
+                                style={{ background: C.courtGreen, color: C.white, border: 'none', borderRadius: 8, minHeight: 36, padding: '0 12px', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}
                               >
                                 {qttrSpeichernLaeuft ? '...' : 'OK'}
                               </button>
                               <button
                                 onClick={() => { setQttrBearbeitenId(null); setQttrFehler(null) }}
-                                style={{ background: 'none', border: '1px solid #DCE7E2', borderRadius: 6, padding: '6px 9px', fontSize: 12, cursor: 'pointer' }}
+                                style={{ background: 'none', border: `1px solid ${C.border}`, borderRadius: 8, minHeight: 36, padding: '0 10px', fontSize: 12.5, cursor: 'pointer' }}
                               >
                                 ✕
                               </button>
                             </div>
                           ) : (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                              <span style={{ fontSize: 13, fontWeight: 700, color: '#1C8A4E' }}>{mitglied.qttr ?? '–'}</span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <span style={{ fontFamily: fontMono, fontSize: 14, fontWeight: 700, color: C.courtGreen }}>{mitglied.qttr ?? '–'}</span>
                               {bearbeitenErlaubt && (
                                 <button
                                   onClick={() => qttrBearbeitungStarten(mitglied)}
-                                  style={{ background: 'none', border: 'none', color: '#1C8A4E', fontSize: 12, cursor: 'pointer', padding: 0 }}
+                                  style={{ background: 'none', border: 'none', color: C.courtGreen, fontSize: 14, cursor: 'pointer', padding: 4, minWidth: 32, minHeight: 32 }}
                                 >
                                   ✏️
                                 </button>
@@ -261,12 +275,12 @@ function Mannschaften({ session }) {
                     </div>
                   )}
 
-                  {qttrFehler && <p style={{ color: '#c0392b', fontSize: 12, marginTop: 8 }}>{qttrFehler}</p>}
+                  {qttrFehler && <p style={{ color: C.danger, fontSize: 12, marginTop: 8 }}>{qttrFehler}</p>}
 
                   {kaderListe.length > KADER_VORSCHAU_ANZAHL && (
                     <button
                       onClick={() => setKaderAlleAnzeigen(prev => ({ ...prev, [m.id]: !zeigeAlle }))}
-                      style={{ background: 'none', border: 'none', color: '#5B6D66', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', padding: 0, marginTop: 10 }}
+                      style={{ background: 'none', border: 'none', color: C.inkMuted, fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, marginTop: 12, minHeight: 32 }}
                     >
                       {zeigeAlle ? '▲ Weniger anzeigen' : `▼ Alle ${kaderListe.length} Spieler anzeigen`}
                     </button>
@@ -277,7 +291,7 @@ function Mannschaften({ session }) {
           )
         })}
 
-        {mannschaften.length === 0 && <p style={{ color: '#5B6D66', fontSize: 14 }}>Noch keine Mannschaften angelegt.</p>}
+        {mannschaften.length === 0 && <p style={{ color: C.inkMuted, fontSize: 14 }}>Noch keine Mannschaften angelegt.</p>}
       </div>
 
       <BottomNav istAdmin={true} session={session} />
@@ -285,4 +299,5 @@ function Mannschaften({ session }) {
   )
 }
 
-export default Mannschaften 
+export default Mannschaften
+ 
