@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from './supabaseClient'
 import Brand from './Brand'
@@ -19,9 +19,11 @@ function Chats({ session }) {
 
       const { data: zuordnungen } = await supabase
         .from('mannschaftszuordnungen')
-        .select('mannschaft_id, mannschaften(name)')
+        .select('mannschaft_id, mannschaften(name, archiviert)')
         .eq('benutzer_id', session.user.id)
-      const teams = (zuordnungen || []).map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
+      const teams = (zuordnungen || [])
+        .filter(z => z.mannschaften && !z.mannschaften.archiviert)
+        .map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
       setTeamChats(teams)
 
       const { data: teilnahmen } = await supabase
@@ -35,10 +37,12 @@ function Chats({ session }) {
       if (aufstellungIds.length > 0) {
         const { data: veroeffentlichte } = await supabase
           .from('aufstellungen')
-          .select('spiel_id, spiele(id, gegner, heim_oder_auswaerts, datum, mannschaften(name))')
+          .select('spiel_id, spiele(id, gegner, heim_oder_auswaerts, datum, mannschaften(name, archiviert))')
           .in('id', aufstellungIds)
           .eq('veroeffentlicht', true)
-        spielChatsListe = (veroeffentlichte || []).map(a => a.spiele).filter(Boolean)
+        spielChatsListe = (veroeffentlichte || [])
+          .map(a => a.spiele)
+          .filter(s => s && !s.mannschaften?.archiviert)
       }
       setSpielChats(spielChatsListe)
       setLadend(false)
@@ -91,3 +95,4 @@ function Chats({ session }) {
 }
 
 export default Chats
+ 
