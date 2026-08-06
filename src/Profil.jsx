@@ -22,21 +22,13 @@ function Profil({ session }) {
   // Profilbearbeitung
   const [bearbeitenModus, setBearbeitenModus] = useState(false)
   const [telefonnummer, setTelefonnummer] = useState('')
+  const [geburtsdatum, setGeburtsdatum] = useState('')
   const [profilbildHochladend, setProfilbildHochladend] = useState(false)
 
   // Name ändern
   const [nameBearbeiten, setNameBearbeiten] = useState(false)
   const [vornameEingabe, setVornameEingabe] = useState('')
   const [nachnameEingabe, setNachnameEingabe] = useState('')
-
-  // Passwort ändern
-  const [neuesPasswort, setNeuesPasswort] = useState('')
-  const [neuesPasswortWiederholen, setNeuesPasswortWiederholen] = useState('')
-  const [passwortMeldung, setPasswortMeldung] = useState(null)
-
-  // E-Mail ändern
-  const [neueEmail, setNeueEmail] = useState('')
-  const [emailMeldung, setEmailMeldung] = useState(null)
 
   // Hauptmannschaft
   const [hauptmannschaftId, setHauptmannschaftId] = useState(null)
@@ -66,6 +58,7 @@ function Profil({ session }) {
 
         setProfil(bData)
         setTelefonnummer(bData?.telefonnummer || '')
+        setGeburtsdatum(bData?.geburtsdatum || '')
         setVornameEingabe(bData?.vorname || '')
         setNachnameEingabe(bData?.nachname || '')
         setQttrEingabe(bData?.qttr?.toString() || '')
@@ -76,7 +69,7 @@ function Profil({ session }) {
         setNotifErinnerung(bData?.benachrichtigung_erinnerung ?? true)
         setNotifErsatzanfrage(bData?.benachrichtigung_ersatzanfrage ?? true)
 
-        // 2. Mannschaften & Rollen des Benutzers abfragen (archivierte ausblenden)
+        // 2. Mannschaften & Rollen des Benutzers abfragen
         const { data: mDataRoh } = await supabase
           .from('mannschaftszuordnungen')
           .select('id, rolle, ist_hauptmannschaft, mannschaften(id, name, archiviert)')
@@ -87,7 +80,6 @@ function Profil({ session }) {
         setMeineMannschaften(mData)
         setHauptmannschaftId(mData?.find(m => m.ist_hauptmannschaft)?.id || null)
 
-        // Prüfen, ob der Nutzer mindestens in einem (nicht-archivierten) Team Spielführer/Stellv. ist
         const hatSpielfuehrerRolle = mData?.some(m => m.rolle === 'spielfuehrer' || m.rolle === 'stellvertreter')
         setIstSpielfuehrer(hatSpielfuehrerRolle)
 
@@ -111,9 +103,12 @@ function Profil({ session }) {
     await supabase.from('benutzer').update({ [feld]: wert }).eq('id', session.user.id)
   }
 
-  const telefonSpeichern = async () => {
-    await supabase.from('benutzer').update({ telefonnummer }).eq('id', session.user.id)
-    setProfil(prev => ({ ...prev, telefonnummer }))
+  const kontaktdatenSpeichern = async () => {
+    await supabase.from('benutzer').update({
+      telefonnummer,
+      geburtsdatum: geburtsdatum || null
+    }).eq('id', session.user.id)
+    setProfil(prev => ({ ...prev, telefonnummer, geburtsdatum }))
     setBearbeitenModus(false)
   }
 
@@ -135,43 +130,6 @@ function Profil({ session }) {
     await supabase.from('benutzer').update({ vorname: vornameEingabe.trim(), nachname: nachnameEingabe.trim() }).eq('id', session.user.id)
     setProfil(prev => ({ ...prev, vorname: vornameEingabe.trim(), nachname: nachnameEingabe.trim() }))
     setNameBearbeiten(false)
-  }
-
-  const passwortAendern = async (e) => {
-    e.preventDefault()
-    setPasswortMeldung(null)
-    if (neuesPasswort.length < 6) {
-      setPasswortMeldung({ typ: 'error', text: 'Das Passwort muss mindestens 6 Zeichen haben.' })
-      return
-    }
-    if (neuesPasswort !== neuesPasswortWiederholen) {
-      setPasswortMeldung({ typ: 'error', text: 'Die Passwörter stimmen nicht überein.' })
-      return
-    }
-    const { error } = await supabase.auth.updateUser({ password: neuesPasswort })
-    if (error) {
-      setPasswortMeldung({ typ: 'error', text: error.message })
-    } else {
-      setPasswortMeldung({ typ: 'success', text: 'Passwort erfolgreich geändert.' })
-      setNeuesPasswort('')
-      setNeuesPasswortWiederholen('')
-    }
-  }
-
-  const emailAendern = async (e) => {
-    e.preventDefault()
-    setEmailMeldung(null)
-    if (!neueEmail.trim() || !neueEmail.includes('@')) {
-      setEmailMeldung({ typ: 'error', text: 'Bitte eine gültige E-Mail-Adresse eingeben.' })
-      return
-    }
-    const { error } = await supabase.auth.updateUser({ email: neueEmail.trim() })
-    if (error) {
-      setEmailMeldung({ typ: 'error', text: error.message })
-    } else {
-      setEmailMeldung({ typ: 'success', text: 'Bestätigungslink wurde an die neue Adresse gesendet. Die Änderung wird erst nach Bestätigung aktiv.' })
-      setNeueEmail('')
-    }
   }
 
   const hauptmannschaftAendern = async (zuordnungId) => {
@@ -204,7 +162,6 @@ function Profil({ session }) {
       return
     }
 
-    // Verlauf mitschreiben
     await supabase.from('qttr_verlauf').insert({
       benutzer_id: session.user.id,
       qttr_wert: wert,
@@ -244,6 +201,13 @@ function Profil({ session }) {
   const getInitials = () => {
     if (!profil?.vorname && !profil?.nachname) return '👤'
     return `${profil?.vorname?.[0] || ''}${profil?.nachname?.[0] || ''}`.toUpperCase()
+  }
+
+  const datumFormatieren = (datumStr) => {
+    if (!datumStr) return ''
+    const parts = datumStr.split('-')
+    if (parts.length !== 3) return datumStr
+    return `${parts[2]}.${parts[1]}.${parts[0]}`
   }
 
   if (ladend) {
@@ -311,25 +275,47 @@ function Profil({ session }) {
             <p style={{ margin: '2px 0 4px', fontSize: 13, color: '#5B6D66' }}>
               {session?.user?.email}
             </p>
+
             {bearbeitenModus ? (
-              <div style={{ display: 'flex', gap: 6, marginTop: 4 }}>
-                <input
-                  type="tel"
-                  value={telefonnummer}
-                  onChange={e => setTelefonnummer(e.target.value)}
-                  placeholder="Telefonnummer"
-                  style={{ flex: 1, padding: '6px 8px', borderRadius: 6, border: '1px solid #DCE7E2', fontSize: 13 }}
-                />
-                <button onClick={telefonSpeichern} style={{ background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}>OK</button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+                <div>
+                  <label style={{ fontSize: 11, color: '#5B6D66', display: 'block', marginBottom: 2 }}>Telefonnummer</label>
+                  <input
+                    type="tel"
+                    value={telefonnummer}
+                    onChange={e => setTelefonnummer(e.target.value)}
+                    placeholder="Telefonnummer"
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', borderRadius: 6, border: '1px solid #DCE7E2', fontSize: 13 }}
+                  />
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, color: '#5B6D66', display: 'block', marginBottom: 2 }}>Geburtsdatum</label>
+                  <input
+                    type="date"
+                    value={geburtsdatum}
+                    onChange={e => setGeburtsdatum(e.target.value)}
+                    style={{ width: '100%', boxSizing: 'border-box', padding: '6px 8px', borderRadius: 6, border: '1px solid #DCE7E2', fontSize: 13 }}
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: 6, marginTop: 2 }}>
+                  <button onClick={kontaktdatenSpeichern} style={{ background: '#1C8A4E', color: 'white', border: 'none', borderRadius: 6, padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}>Speichern</button>
+                  <button onClick={() => setBearbeitenModus(false)} style={{ background: 'none', border: '1px solid #DCE7E2', borderRadius: 6, padding: '6px 10px', fontSize: 12, cursor: 'pointer' }}>Abbrechen</button>
+                </div>
               </div>
             ) : (
-              <p style={{ margin: '0 0 4px', fontSize: 13, color: '#5B6D66' }}>
-                📞 {profil?.telefonnummer || 'Keine Telefonnummer hinterlegt'}{' '}
-                <button onClick={() => setBearbeitenModus(true)} style={{ background: 'none', border: 'none', color: '#1C8A4E', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>✏️</button>
-              </p>
+              <div>
+                <p style={{ margin: '0 0 2px', fontSize: 13, color: '#5B6D66' }}>
+                  📞 {profil?.telefonnummer || 'Keine Telefonnummer hinterlegt'}{' '}
+                  <button onClick={() => setBearbeitenModus(true)} style={{ background: 'none', border: 'none', color: '#1C8A4E', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>✏️</button>
+                </p>
+                <p style={{ margin: 0, fontSize: 13, color: '#5B6D66' }}>
+                  🎂 {profil?.geburtsdatum ? datumFormatieren(profil.geburtsdatum) : 'Kein Geburtsdatum hinterlegt'}
+                </p>
+              </div>
             )}
+
             {profil?.ist_administrator && (
-              <span style={{ fontSize: 11, background: '#E8F5E9', color: '#1C8A4E', padding: '2px 8px', borderRadius: 12, fontWeight: 600 }}>
+              <span style={{ display: 'inline-block', marginTop: 6, fontSize: 11, background: '#E8F5E9', color: '#1C8A4E', padding: '2px 8px', borderRadius: 12, fontWeight: 600 }}>
                 👑 Administrator
               </span>
             )}
@@ -419,7 +405,6 @@ function Profil({ session }) {
                   </button>
                 </div>
 
-                {/* Auto-Import Platzhalter — folgt in einer der nächsten Versionen */}
                 <button
                   disabled
                   title="Kommt in Kürze"
