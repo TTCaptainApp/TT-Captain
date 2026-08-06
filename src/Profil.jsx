@@ -76,17 +76,19 @@ function Profil({ session }) {
         setNotifErinnerung(bData?.benachrichtigung_erinnerung ?? true)
         setNotifErsatzanfrage(bData?.benachrichtigung_ersatzanfrage ?? true)
 
-        // 2. Mannschaften & Rollen des Benutzers abfragen
-        const { data: mData } = await supabase
+        // 2. Mannschaften & Rollen des Benutzers abfragen (archivierte ausblenden)
+        const { data: mDataRoh } = await supabase
           .from('mannschaftszuordnungen')
-          .select('id, rolle, ist_hauptmannschaft, mannschaften(id, name)')
+          .select('id, rolle, ist_hauptmannschaft, mannschaften(id, name, archiviert)')
           .eq('benutzer_id', session.user.id)
 
-        setMeineMannschaften(mData || [])
+        const mData = (mDataRoh || []).filter(m => m.mannschaften && !m.mannschaften.archiviert)
+
+        setMeineMannschaften(mData)
         setHauptmannschaftId(mData?.find(m => m.ist_hauptmannschaft)?.id || null)
 
-        // Prüfen, ob der Nutzer mindestens in einem Team Spielführer ist
-        const hatSpielfuehrerRolle = mData?.some(m => m.rolle === 'spielfuehrer')
+        // Prüfen, ob der Nutzer mindestens in einem (nicht-archivierten) Team Spielführer/Stellv. ist
+        const hatSpielfuehrerRolle = mData?.some(m => m.rolle === 'spielfuehrer' || m.rolle === 'stellvertreter')
         setIstSpielfuehrer(hatSpielfuehrerRolle)
 
       } catch (err) {
