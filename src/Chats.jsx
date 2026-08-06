@@ -26,7 +26,7 @@ function Chats({ session }) {
         .filter(z => z.mannschaften && !z.mannschaften.archiviert)
         .map(z => ({ mannschaft_id: z.mannschaft_id, name: z.mannschaften?.name }))
       setTeamChats(teams)
-      setIstSpielfuehrer((zuordnungen || []).some(z => z.rolle === 'spielführer' || z.rolle === 'stellv_spielführer'))
+      setIstSpielfuehrer((zuordnungen || []).some(z => z.rolle === 'spielfuehrer' || z.rolle === 'stellvertreter'))
 
       const { data: teilnahmen } = await supabase
         .from('aufstellung_spieler')
