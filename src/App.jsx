@@ -12,7 +12,6 @@ import Chat from './Chat'
 import Profil from './Profil'
 import Admin from './Admin'
 import NeuesPasswort from './NeuesPasswort'
-import Benachrichtigungen from './Benachrichtigungen'
 
 function App() {
   const [session, setSession] = useState(null)
@@ -53,7 +52,6 @@ function App() {
       <Route path="/profil" element={<Profil session={session} />} />
       <Route path="/admin" element={<Admin session={session} />} />
       <Route path="/neues-passwort" element={<NeuesPasswort />} />
-      <Route path="/benachrichtigungen" element={<Benachrichtigungen session={session} />} />
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
   )
