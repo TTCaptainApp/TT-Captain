@@ -25,6 +25,88 @@ function Dashboard({ session }) {
   const [benachrichtigungen, setBenachrichtigungen] = useState([])
   const [benachrichtigungenAnzahl, setBenachrichtigungenAnzahl] = useState(0)
 
+  // Geburtstag-States
+  const [istHeuteGeburtstag, setIstHeuteGeburtstag] = useState(false)
+  const [geburtstageKameraden, setGeburtstageKameraden] = useState([])
+
+  const berechneTageBisGeburtstag = (geburtsdatumStr) => {
+    if (!geburtsdatumStr) return null
+    const heute = new Date()
+    heute.setHours(0, 0, 0, 0)
+
+    const parts = geburtsdatumStr.split('-')
+    if (parts.length !== 3) return null
+    const birthYear = parseInt(parts[0], 10)
+    const birthMonth = parseInt(parts[1], 10) - 1
+    const birthDay = parseInt(parts[2], 10)
+
+    let naechsterGeb = new Date(heute.getFullYear(), birthMonth, birthDay)
+    naechsterGeb.setHours(0, 0, 0, 0)
+
+    if (naechsterGeb < heute) {
+      naechsterGeb = new Date(heute.getFullYear() + 1, birthMonth, birthDay)
+      naechsterGeb.setHours(0, 0, 0, 0)
+    }
+
+    const diffMs = naechsterGeb.getTime() - heute.getTime()
+    const tage = Math.round(diffMs / (1000 * 60 * 60 * 24))
+    const alter = naechsterGeb.getFullYear() - birthYear
+
+    return { tage, alter }
+  }
+
+  const ladeGeburtstage = async () => {
+    // 1. Eigener Geburtstag prüfen
+    const { data: eigenerBenutzer } = await supabase
+      .from('benutzer')
+      .select('geburtsdatum')
+      .eq('id', session.user.id)
+      .maybeSingle()
+
+    if (eigenerBenutzer?.geburtsdatum) {
+      const stats = berechneTageBisGeburtstag(eigenerBenutzer.geburtsdatum)
+      setIstHeuteGeburtstag(stats?.tage === 0)
+    }
+
+    // 2. Mannschaftskameraden prüfen
+    const { data: meineZuordnungen } = await supabase
+      .from('mannschaftszuordnungen')
+      .select('mannschaft_id')
+      .eq('benutzer_id', session.user.id)
+
+    const mannschaftIds = (meineZuordnungen || []).map(z => z.mannschaft_id)
+    if (mannschaftIds.length === 0) return
+
+    const { data: kollegenZuordnungen } = await supabase
+      .from('mannschaftszuordnungen')
+      .select('benutzer(id, vorname, nachname, geburtsdatum)')
+      .in('mannschaft_id', mannschaftIds)
+      .neq('benutzer_id', session.user.id)
+
+    const verarbeiteteIds = new Set()
+    const geburtstagsListe = []
+
+    ;(kollegenZuordnungen || []).forEach(z => {
+      const b = z.benutzer
+      if (b && b.geburtsdatum && !verarbeiteteIds.has(b.id)) {
+        verarbeiteteIds.add(b.id)
+        const stats = berechneTageBisGeburtstag(b.geburtsdatum)
+        if (stats && stats.tage >= 0 && stats.tage <= 3) {
+          geburtstagsListe.push({
+            id: b.id,
+            vorname: b.vorname,
+            nachname: b.nachname,
+            tage: stats.tage,
+            alter: stats.alter
+          })
+        }
+      }
+    })
+
+    geburtstagsListe.sort((a, b) => a.tage - b.tage)
+    setGeburtstageKameraden(geburtstagsListe)
+  }
+
   const ladeNaechstesSpiel = async () => {
     const { data: zuordnungen } = await supabase
       .from('mannschaftszuordnungen')
@@ -129,6 +211,7 @@ function Dashboard({ session }) {
     ladeOffeneSpiele()
     ladeErsatzanfragen()
     ladeBenachrichtigungen()
+    ladeGeburtstage()
   }
 
   useEffect(() => {
@@ -188,8 +271,6 @@ function Dashboard({ session }) {
     return datum.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })
   }
 
-  // Das nächste Spiel wird oben separat gezeigt, daher aus der
-  // "Offene Rückmeldungen"-Liste herausfiltern (keine Dopplung)
   const offeneOhneNaechstes = offeneSpiele.filter(s => s.id !== naechstesSpiel?.id)
   const sichtbareSpiele = alleAnzeigen ? offeneOhneNaechstes : offeneOhneNaechstes.slice(0, ANZAHL_SICHTBAR)
   const versteckteAnzahl = offeneOhneNaechstes.length - sichtbareSpiele.length
@@ -204,10 +285,60 @@ function Dashboard({ session }) {
         <h1 style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 22, margin: '12px 0 4px' }}>
           Hallo {vorname || ''} 👋
         </h1>
-        <p style={{ color: '#5B6D66', fontSize: 14, marginBottom: 20 }}>
+        <p style={{ color: '#5B6D66', fontSize: 14, marginBottom: 16 }}>
           Schön, dass du dabei bist.
         </p>
 
+        {/* EIGENER GEBURTSTAGSGRUSS */}
+        {istHeuteGeburtstag && (
+          <div style={{
+            background: 'linear-gradient(135deg, #FFD700 0%, #FF8C00 100%)',
+            borderRadius: 16, padding: '18px 16px', marginBottom: 16, color: '#FFFFFF',
+            boxShadow: '0 4px 12px rgba(255,140,0,0.25)', textShadow: '0 1px 2px rgba(0,0,0,0.2)'
+          }}>
+            <div style={{ fontSize: 24, marginBottom: 4 }}>🎉 🎂 🏓</div>
+            <div style={{ fontFamily: 'Sora, sans-serif', fontWeight: 700, fontSize: 18, marginBottom: 4 }}>
+              Herzlichen Glückwunsch zum Geburtstag, {vorname}!
+            </div>
+            <div style={{ fontSize: 13.5, lineHeight: 1.4, opacity: 0.95 }}>
+              Das gesamte Team wünscht dir alles Gute, viel Gesundheit und maximale Erfolge am Tisch!
+            </div>
+          </div>
+        )}
+
+        {/* GEBURTSTAGSERINNERUNG AN MANNSCHAFTSKAMERADEN */}
+        {geburtstageKameraden.length > 0 && (
+          <div style={{
+            background: '#ffffff', border: '2px solid #9B51E0', borderRadius: 16,
+            padding: '16px', marginBottom: 16
+          }}>
+            <div style={{
+              fontFamily: 'JetBrains Mono, monospace', fontSize: 11, fontWeight: 700,
+              letterSpacing: '.06em', textTransform: 'uppercase', color: '#9B51E0', marginBottom: 8
+            }}>
+              🎂 Geburtstage im Team
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {geburtstageKameraden.map(k => (
+                <div key={k.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13.5 }}>
+                  <div>
+                    <strong>{k.vorname} {k.nachname}</strong>
+                    <span style={{ fontSize: 12, color: '#5B6D66', marginLeft: 6 }}>(wird {k.alter})</span>
+                  </div>
+                  <span style={{
+                    fontSize: 12, fontWeight: 700, padding: '3px 8px', borderRadius: 8,
+                    background: k.tage === 0 ? '#FEF3C7' : '#F3E8FF',
+                    color: k.tage === 0 ? '#D97706' : '#7E22CE'
+                  }}>
+                    {k.tage === 0 ? 'Heute! 🎉' : k.tage === 1 ? 'Morgen' : `in ${k.tage} Tagen`}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* BENACHRICHTIGUNGEN */}
         {benachrichtigungen.length > 0 && (
           <div style={{
             background: '#ffffff', border: '2px solid #2E6FE0', borderRadius: 16,
@@ -428,3 +559,4 @@ function Dashboard({ session }) {
 }
 
 export default Dashboard
+ 
