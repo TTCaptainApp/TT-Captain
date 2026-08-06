@@ -19,7 +19,7 @@ function Profil({ session }) {
   const [notifErinnerung, setNotifErinnerung] = useState(true)
   const [notifErsatzanfrage, setNotifErsatzanfrage] = useState(true)
 
-  // Profilbearbeitung
+  // Profil- / Kontaktdatenbearbeitung
   const [bearbeitenModus, setBearbeitenModus] = useState(false)
   const [telefonnummer, setTelefonnummer] = useState('')
   const [geburtsdatum, setGeburtsdatum] = useState('')
@@ -105,10 +105,15 @@ function Profil({ session }) {
 
   const kontaktdatenSpeichern = async () => {
     await supabase.from('benutzer').update({
-      telefonnummer,
+      telefonnummer: telefonnummer.trim() || null,
       geburtsdatum: geburtsdatum || null
     }).eq('id', session.user.id)
-    setProfil(prev => ({ ...prev, telefonnummer, geburtsdatum }))
+    
+    setProfil(prev => ({ 
+      ...prev, 
+      telefonnummer: telefonnummer.trim() || null, 
+      geburtsdatum: geburtsdatum || null 
+    }))
     setBearbeitenModus(false)
   }
 
@@ -244,6 +249,7 @@ function Profil({ session }) {
             )}
             <input type="file" accept="image/*" onChange={profilbildHochladen} style={{ display: 'none' }} disabled={profilbildHochladend} />
           </label>
+
           <div style={{ flex: 1 }}>
             {nameBearbeiten ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginBottom: 6 }}>
@@ -272,14 +278,16 @@ function Profil({ session }) {
                 <button onClick={() => setNameBearbeiten(true)} style={{ background: 'none', border: 'none', color: '#1C8A4E', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>✏️</button>
               </h2>
             )}
-            <p style={{ margin: '2px 0 4px', fontSize: 13, color: '#5B6D66' }}>
+
+            <p style={{ margin: '2px 0 6px', fontSize: 13, color: '#5B6D66' }}>
               {session?.user?.email}
             </p>
 
+            {/* TELEFONNUMMER & GEBURTSDATUM BEARBEITUNG */}
             {bearbeitenModus ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 6, background: '#F6FAF8', padding: 10, borderRadius: 8, border: '1px solid #DCE7E2' }}>
                 <div>
-                  <label style={{ fontSize: 11, color: '#5B6D66', display: 'block', marginBottom: 2 }}>Telefonnummer</label>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: '#5B6D66', display: 'block', marginBottom: 2 }}>Telefonnummer</label>
                   <input
                     type="tel"
                     value={telefonnummer}
@@ -289,7 +297,7 @@ function Profil({ session }) {
                   />
                 </div>
                 <div>
-                  <label style={{ fontSize: 11, color: '#5B6D66', display: 'block', marginBottom: 2 }}>Geburtsdatum</label>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: '#5B6D66', display: 'block', marginBottom: 2 }}>Geburtsdatum</label>
                   <input
                     type="date"
                     value={geburtsdatum}
@@ -303,19 +311,20 @@ function Profil({ session }) {
                 </div>
               </div>
             ) : (
-              <div>
-                <p style={{ margin: '0 0 2px', fontSize: 13, color: '#5B6D66' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                <p style={{ margin: 0, fontSize: 13, color: '#5B6D66' }}>
                   📞 {profil?.telefonnummer || 'Keine Telefonnummer hinterlegt'}{' '}
                   <button onClick={() => setBearbeitenModus(true)} style={{ background: 'none', border: 'none', color: '#1C8A4E', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>✏️</button>
                 </p>
                 <p style={{ margin: 0, fontSize: 13, color: '#5B6D66' }}>
-                  🎂 {profil?.geburtsdatum ? datumFormatieren(profil.geburtsdatum) : 'Kein Geburtsdatum hinterlegt'}
+                  🎂 {profil?.geburtsdatum ? datumFormatieren(profil.geburtsdatum) : 'Kein Geburtsdatum hinterlegt'}{' '}
+                  <button onClick={() => setBearbeitenModus(true)} style={{ background: 'none', border: 'none', color: '#1C8A4E', fontSize: 12, fontWeight: 600, cursor: 'pointer', padding: 0 }}>✏️</button>
                 </p>
               </div>
             )}
 
             {profil?.ist_administrator && (
-              <span style={{ display: 'inline-block', marginTop: 6, fontSize: 11, background: '#E8F5E9', color: '#1C8A4E', padding: '2px 8px', borderRadius: 12, fontWeight: 600 }}>
+              <span style={{ display: 'inline-block', marginTop: 8, fontSize: 11, background: '#E8F5E9', color: '#1C8A4E', padding: '2px 8px', borderRadius: 12, fontWeight: 600 }}>
                 👑 Administrator
               </span>
             )}
