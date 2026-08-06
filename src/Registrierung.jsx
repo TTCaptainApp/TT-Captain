@@ -11,7 +11,7 @@ const cardStyle = {
   padding: '28px 24px', width: '100%', maxWidth: 360,
   display: 'flex', flexDirection: 'column', gap: 10
 }
-const inputStyle = { padding: '10px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #DCE7E2', fontFamily: 'inherit', width: '100%' }
+const inputStyle = { padding: '10px 12px', fontSize: 15, borderRadius: 8, border: '1px solid #DCE7E2', fontFamily: 'inherit', width: '100%', boxSizing: 'border-box' }
 const wrapStyle = { position: 'relative', display: 'flex', flexDirection: 'column' }
 const hintStyle = { fontSize: 12, textAlign: 'left', marginTop: 2 }
 const eyeButtonStyle = { position: 'absolute', right: 8, top: 8, background: 'none', border: 'none', cursor: 'pointer', fontSize: 16, padding: 2 }
@@ -37,6 +37,7 @@ function Registrierung({ inviteCode }) {
   const [email, setEmail] = useState('')
   const [emailWiederholung, setEmailWiederholung] = useState('')
   const [telefonnummer, setTelefonnummer] = useState('')
+  const [geburtsdatum, setGeburtsdatum] = useState('')
   const [passwort, setPasswort] = useState('')
   const [passwortWiederholung, setPasswortWiederholung] = useState('')
   const [passwortSichtbar, setPasswortSichtbar] = useState(false)
@@ -65,7 +66,15 @@ function Registrierung({ inviteCode }) {
     const { error } = await supabase.auth.signUp({
       email: email.trim(),
       password: passwort,
-      options: { data: { vorname, nachname, telefonnummer, invite_code: inviteCode } }
+      options: { 
+        data: { 
+          vorname, 
+          nachname, 
+          telefonnummer, 
+          geburtsdatum: geburtsdatum || null, 
+          invite_code: inviteCode 
+        } 
+      }
     })
     setLadend(false)
     if (error) setFehler(error.message)
@@ -87,6 +96,18 @@ function Registrierung({ inviteCode }) {
         </div>
 
         <input style={inputStyle} placeholder="Telefonnummer (optional)" value={telefonnummer} onChange={e => setTelefonnummer(e.target.value)} />
+
+        <div>
+          <label style={{ fontSize: 11, color: '#5B6D66', display: 'block', textAlign: 'left', marginBottom: 2 }}>
+            Geburtsdatum (optional)
+          </label>
+          <input 
+            style={inputStyle} 
+            type="date" 
+            value={geburtsdatum} 
+            onChange={e => setGeburtsdatum(e.target.value)} 
+          />
+        </div>
 
         <div style={wrapStyle}>
           <input style={inputStyle} type={passwortSichtbar ? 'text' : 'password'} placeholder="Passwort" value={passwort} onChange={e => setPasswort(e.target.value)} required minLength={6} />
@@ -120,4 +141,5 @@ function Registrierung({ inviteCode }) {
   )
 }
 
-export default Registrierung 
+export default Registrierung
+ 
