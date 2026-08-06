@@ -33,10 +33,13 @@ const secondaryButtonStyle = { ...buttonStyle, background: 'transparent', color:
 
 const statusStyle = {
   geplant: { bg: C.mint, fg: C.courtGreen },
+  veroeffentlicht: { bg: C.courtGreen, fg: C.white },
   verlegt: { bg: C.amberBg, fg: C.amber },
   abgesagt: { bg: C.dangerBg, fg: C.danger },
   gespielt: { bg: '#EEF1F0', fg: C.inkMuted }
 }
+
+const mapsLink = (adresse) => `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(adresse)}`
 
 function Spiele({ session }) {
   const [istAdmin, setIstAdmin] = useState(false)
@@ -356,7 +359,9 @@ function Spiele({ session }) {
 
           const istHeim = s.heim_oder_auswaerts === 'heim'
           const akzentFarbe = istHeim ? C.courtGreen : C.ballOrange
-          const st = statusStyle[s.status] || statusStyle.gespielt
+          const istVeroeffentlicht = !!veroeffentlichteAufstellung && s.status === 'geplant'
+          const statusLabel = istVeroeffentlicht ? 'veröffentlicht' : s.status
+          const st = istVeroeffentlicht ? statusStyle.veroeffentlicht : (statusStyle[s.status] || statusStyle.gespielt)
           const meineRueckmeldung = meineVerfuegbarkeiten[s.id]
           const counts = verfuegbarkeitCounts[s.id]
 
@@ -396,7 +401,7 @@ function Spiele({ session }) {
                           fontSize: 10.5, fontWeight: 700, letterSpacing: 0.4, textTransform: 'uppercase',
                           background: st.bg, color: st.fg, padding: '4px 9px', borderRadius: 999
                         }}>
-                          {s.status}
+                          {statusLabel}
                         </span>
                         {kannBearbeiten(s.mannschaft_id) && (
                           <button
@@ -423,7 +428,19 @@ function Spiele({ session }) {
                     {/* Datum / Zeit / Ort */}
                     <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 4, fontFamily: fontMono, fontSize: 12.5, color: C.inkMuted }}>
                       <div>📅 {formatDatum(s.datum)}{s.uhrzeit ? ` · ${s.uhrzeit.slice(0, 5)} Uhr` : ''}</div>
-                      {s.halle && <div style={{ fontFamily: fontBody }}>📍 {s.halle}</div>}
+                      {s.halle && (
+                        <div style={{ fontFamily: fontBody }}>
+                          📍 {s.halle}{' '}
+                          <a
+                            href={mapsLink(s.halle)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: akzentFarbe, fontWeight: 600, textDecoration: 'none' }}
+                          >
+                            🗺️ Route
+                          </a>
+                        </div>
+                      )}
                     </div>
 
                     {veroeffentlichteAufstellung && (
@@ -500,7 +517,7 @@ function Spiele({ session }) {
                             border: `1px solid ${C.border}`, color: C.ink, fontSize: 14, fontWeight: 600
                           }}
                         >
-                          📋 Aufstellung ansehen
+                          📋 Aufstellung
                         </Link>
                       </div>
                     )}
