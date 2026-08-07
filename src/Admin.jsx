@@ -55,9 +55,9 @@ function Admin({ session }) {
         return
       }
 
-      // 3. Alle Benutzer laden (für Auswahlliste)
+      // 3. Alle Benutzer laden (für Auswahlliste) – über benutzer_profile (DSGVO: eingeschränkte Spalten)
       const { data: bData } = await supabase
-        .from('benutzer')
+        .from('benutzer_profile')
         .select('id, vorname, nachname, email')
         .order('vorname')
 
@@ -83,18 +83,29 @@ function Admin({ session }) {
         setAlleMannschaften(alleM || [])
       }
 
-      // 5. Zuordnungen laden
+      // 5. Zuordnungen laden (zweistufig: erst Zuordnung, dann Namen über benutzer_profile, DSGVO)
       let zQuery = supabase
         .from('mannschaftszuordnungen')
-        .select('id, benutzer_id, mannschaft_id, rolle, benutzer(id, vorname, nachname, email), mannschaften(id, name)')
-      
+        .select('id, benutzer_id, mannschaft_id, rolle, mannschaften(id, name)')
+
       if (!adminFlag) {
         zQuery = zQuery.in('mannschaft_id', gefuehrteTeamIds)
       }
-      const { data: zData } = await zQuery
-      setZuordnungen(zData || [])
+      const { data: zRoh } = await zQuery
 
-      // 6. Offene Löschanträge laden (nur für Administratoren)
+      const benutzerIdsZ = [...new Set((zRoh || []).map(z => z.benutzer_id))]
+      let profilLexZ = {}
+      if (benutzerIdsZ.length > 0) {
+        const { data: profileZ } = await supabase
+          .from('benutzer_profile')
+          .select('id, vorname, nachname, email')
+          .in('id', benutzerIdsZ)
+        profilLexZ = Object.fromEntries((profileZ || []).map(p => [p.id, p]))
+      }
+
+      setZuordnungen((zRoh || []).map(z => ({ ...z, benutzer: profilLexZ[z.benutzer_id] || null })))
+
+      // 6. Offene Löschanträge laden (nur für Administratoren – volle benutzer-Tabelle vorausgesetzt)
       if (adminFlag) {
         const { data: lData } = await supabase
           .from('benutzer')
