@@ -3,33 +3,192 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Datenschutzerklärung – TT Captain</title>
+<title>Datenschutzerklärung | TT Captain</title>
 <style>
-  body{font-family:sans-serif;background:#F6FAF8;color:#16261F;max-width:640px;margin:0 auto;padding:32px 20px;line-height:1.6;}
-  h1{color:#1C8A4E;}
-  h2{color:#1C8A4E;font-size:18px;margin-top:28px;}
-  a{color:#1C8A4E;}
+  :root{
+      --primary:#f15a24;
+      --primary-dark:#d94f1f;
+      --background:#f5f5f5;
+      --card:#ffffff;
+      --text:#222;
+      --border:#ececec;
+  }
+
+  *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+  }
+
+  body{
+      background:var(--background);
+      font-family:Arial,Helvetica,sans-serif;
+      color:var(--text);
+  }
+
+  header{
+      background:white;
+      padding:22px;
+      text-align:center;
+      border-bottom:1px solid #e8e8e8;
+  }
+
+  .logo{
+      font-size:34px;
+      margin-bottom:6px;
+  }
+
+  header h1{
+      color:var(--primary);
+      font-size:28px;
+  }
+
+  .container{
+      max-width:900px;
+      margin:auto;
+      padding:20px;
+  }
+
+  .card{
+      background:var(--card);
+      border:2px solid var(--primary);
+      border-radius:20px;
+      padding:24px;
+      margin-bottom:20px;
+  }
+
+  h2{
+      color:var(--primary);
+      margin-bottom:18px;
+      font-size:22px;
+  }
+
+  p, li{
+      line-height:1.8;
+      margin-bottom:14px;
+  }
+
+  ul{
+      margin-left:20px;
+      margin-bottom:14px;
+  }
+
+  a{
+      color:var(--primary);
+      text-decoration:none;
+  }
+
+  a:hover{
+      text-decoration:underline;
+  }
+
+  .button-area{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-top:30px;
+  }
+
+  .button{
+      flex:1;
+      min-width:170px;
+      text-align:center;
+      background:var(--primary);
+      color:white;
+      padding:14px;
+      border-radius:12px;
+      text-decoration:none;
+      font-weight:bold;
+      transition:.2s;
+  }
+
+  .button:hover{
+      background:var(--primary-dark);
+      text-decoration:none;
+  }
+
+  footer{
+      text-align:center;
+      color:#666;
+      padding:25px;
+      font-size:14px;
+  }
 </style>
 </head>
 <body>
-  <h1>Datenschutzerklärung</h1>
-  <p><em>TODO: Wird vor dem öffentlichen Start vollständig ausformuliert (Art. 13 DSGVO).</em></p>
 
-  <h2>Verantwortlicher</h2>
-  <p>[Vor- und Nachname], [Anschrift], [E-Mail]</p>
+<header>
+  <div class="logo">🏓</div>
+  <h1>TT Captain</h1>
+</header>
 
-  <h2>Welche Daten wir verarbeiten</h2>
-  <p>Name, E-Mail-Adresse, optional Telefonnummer, QTTR-Wert, Verfügbarkeiten, Aufstellungen, Chat-Nachrichten – jeweils nur innerhalb deines Vereins sichtbar.</p>
+<div class="container">
 
-  <h2>Zweck der Verarbeitung</h2>
-  <p>Organisation des Tischtennis-Punktspielbetriebs (Verfügbarkeiten, Aufstellungen, Ersatzspielersuche, Kommunikation).</p>
+  <div class="card">
+    <h2>Datenschutzerklärung</h2>
+    <p>Wir nehmen den Schutz Ihrer persönlichen Daten sehr ernst. Nachfolgend informieren wir Sie ausführlich über den Umgang mit Ihren Daten gemäß der EU-Datenschutz-Grundverordnung (DSGVO).</p>
+  </div>
 
-  <h2>Speicherort</h2>
-  <p>Die Datenbank wird bei Supabase (Region: Frankfurt/Deutschland) gehostet.</p>
+  <div class="card">
+    <h2>1. Verantwortlicher</h2>
+    <p>
+      Verantwortliche Stelle für die Datenverarbeitung in dieser Anwendung ist:<br><br>
+      Björn Dannowski<br>
+      c/o Bohnensack<br>
+      Bahnhofstraße 15d<br>
+      25421 Pinneberg<br>
+      Deutschland<br>
+      E-Mail: <a href="mailto:tt-captain@gmx.de">tt-captain@gmx.de</a>
+    </p>
+  </div>
 
-  <h2>Deine Rechte</h2>
-  <p>Du hast das Recht auf Auskunft, Berichtigung, Löschung und Einschränkung der Verarbeitung deiner Daten (Art. 15–18 DSGVO). Wende dich dazu an die oben genannte Kontaktadresse.</p>
+  <div class="card">
+    <h2>2. Hosting & Infrastruktur</h2>
+    <p>Unsere Anwendung wird bei externen Dienstleistern gehostet, deren Server sich innerhalb der Europäischen Union befinden:</p>
+    <ul>
+      <li>
+        <strong>Vercel (Frontend-Hosting):</strong> Vercel Inc., USA. Bereitstellung der Web-Oberfläche.
+      </li>
+      <li>
+        <strong>Supabase (Datenbank & Authentifizierung):</strong> Supabase Inc. Die Datenbank wird auf Servern in Frankfurt am Main (Deutschland / Region <code>eu-central-1</code>) betrieben.
+      </li>
+    </ul>
+    <p>Die Einbindung dieser Dienste erfolgt im Sinne unseres berechtigten Interesses an einer sicheren, schnellen und fehlerfreien Bereitstellung unseres Online-Angebots (Art. 6 Abs. 1 lit. f DSGVO).</p>
+  </div>
 
-  <p><a href="/">Zurück zur App</a></p>
+  <div class="card">
+    <h2>3. Welche Daten wir verarbeiten & Zweck</h2>
+    <p>Zur Organisation des Tischtennis-Punktspielbetriebs (Verfügbarkeiten, Aufstellungen, Ersatzspielersuche, Kommunikation) erheben und verarbeiten wir folgende Daten, die jeweils nur innerhalb deines Vereins sichtbar sind:</p>
+    <ul>
+      <li><strong>Registrierung & Login:</strong> Name, E-Mail-Adresse und ein verschlüsseltes Passwort (Rechtsgrundlage: Art. 6 Abs. 1 lit. b DSGVO).</li>
+      <li><strong>Spieldaten & Organisation:</strong> Optional Telefonnummer, QTTR-Wert, Verfügbarkeiten, Aufstellungen und Chat-Nachrichten.</li>
+      <li><strong>Server-Log-Dateien:</strong> IP-Adressen und Zugriffszeiten der Hoster zur Sicherstellung des technischen Betriebs.</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>4. Deine Rechte (Betroffenenrechte)</h2>
+    <p>Sie haben gegenüber uns folgende Rechte hinsichtlich der Sie betreffenden personenbezogenen Daten:</p>
+    <ul>
+      <li>Recht auf Auskunft (Art. 15 DSGVO)</li>
+      <li>Recht auf Berichtigung oder Löschung (Art. 16 und 17 DSGVO)</li>
+      <li>Recht auf Einschränkung der Verarbeitung (Art. 18 DSGVO)</li>
+      <li>Recht auf Datenübertragbarkeit (Art. 20 DSGVO)</li>
+    </ul>
+    <p>Wenden Sie sich zur Ausübung dieser Rechte einfach direkt an unsere oben genannte E-Mail-Adresse (<a href="mailto:tt-captain@gmx.de">tt-captain@gmx.de</a>). Zudem steht Ihnen ein Beschwerderecht bei einer Datenschutz-Aufsichtsbehörde zu (Art. 77 DSGVO).</p>
+  </div>
+
+  <div class="button-area">
+    <a class="button" href="/">🏠 Zur Startseite</a>
+    <a class="button" href="/impressum.html">📄 Impressum</a>
+    <a class="button" href="/nutzungsbedingungen.html">📜 Nutzungsbedingungen</a>
+  </div>
+
+</div>
+
+<footer>
+  © 2026 TT Captain
+</footer>
+
 </body>
 </html>
