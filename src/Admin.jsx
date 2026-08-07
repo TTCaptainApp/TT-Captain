@@ -382,6 +382,7 @@ function Admin({ session }) {
               >
                 <option value="spieler">🏓 Spieler</option>
                 <option value="spielfuehrer">📋 Spielführer</option>
+                <option value="stellvertreter">🎗️ Stellv. Spielführer</option>
               </select>
             </div>
 
