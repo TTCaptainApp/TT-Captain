@@ -91,11 +91,7 @@ function Spiele({ session }) {
           veroeffentlicht,
           aufstellung_spieler (
             position,
-            benutzer (
-              vorname,
-              nachname,
-              qttr
-            )
+            benutzer_id
           )
         )
       `)
@@ -103,8 +99,46 @@ function Spiele({ session }) {
 
     if (error) {
       console.error('Fehler beim Laden der Spiele:', error)
+      setSpiele([])
+      return
     }
-    setSpiele(data || [])
+
+    // Alle benutzer_ids aus veröffentlichten Aufstellungen einsammeln
+    const alleIds = new Set()
+    ;(data || []).forEach(s => {
+      const aufstellungen = Array.isArray(s.aufstellungen) ? s.aufstellungen : (s.aufstellungen ? [s.aufstellungen] : [])
+      aufstellungen.forEach(a => {
+        if (a?.veroeffentlicht) {
+          ;(a.aufstellung_spieler || []).forEach(asp => alleIds.add(asp.benutzer_id))
+        }
+      })
+    })
+
+    let profilLex = {}
+    if (alleIds.size > 0) {
+      const { data: profile } = await supabase
+        .from('benutzer_profile')
+        .select('id, vorname, nachname, qttr')
+        .in('id', Array.from(alleIds))
+      profilLex = Object.fromEntries((profile || []).map(p => [p.id, p]))
+    }
+
+    // Namen wieder in die Struktur einsetzen, damit der Rest der Komponente unverändert bleibt
+    const angereichert = (data || []).map(s => {
+      const aufstellungen = Array.isArray(s.aufstellungen) ? s.aufstellungen : (s.aufstellungen ? [s.aufstellungen] : [])
+      return {
+        ...s,
+        aufstellungen: aufstellungen.map(a => ({
+          ...a,
+          aufstellung_spieler: (a.aufstellung_spieler || []).map(asp => ({
+            ...asp,
+            benutzer: profilLex[asp.benutzer_id] || null
+          }))
+        }))
+      }
+    })
+
+    setSpiele(angereichert)
   }
 
   const ladeVerfuegbarkeiten = async () => {
