@@ -526,7 +526,7 @@ function Profil({ session }) {
         </button>
 
         {/* GEFAHRENZONE: KONTO LÖSCHEN */}
-        <div style={{ border: '1px dashed #F87171', borderRadius: 16, padding: 16 }}>
+        <div style={{ border: '1px dashed #F87171', borderRadius: 16, padding: 16, marginBottom: 24 }}>
           <h3 style={{ fontFamily: fontDisplay, fontSize: 13, margin: '0 0 8px', color: '#991B1B' }}>
             ⚠️ Gefahrenzone
           </h3>
@@ -556,6 +556,19 @@ function Profil({ session }) {
           {loeschMeldung && (
             <p style={{ fontSize: 12.5, margin: '10px 0 0', color: loeschMeldung.typ === 'error' ? C.danger : C.courtGreen }}>{loeschMeldung.text}</p>
           )}
+        </div>
+
+        {/* RECHTLICHES (DSGVO) */}
+        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 14px', paddingTop: 4 }}>
+          <a href="/impressum.html" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: C.inkMuted, textDecoration: 'underline' }}>
+            Impressum
+          </a>
+          <a href="/datenschutz.html" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: C.inkMuted, textDecoration: 'underline' }}>
+            Datenschutz
+          </a>
+          <a href="/nutzungsbedingungen.html" target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: C.inkMuted, textDecoration: 'underline' }}>
+            Nutzungsbedingungen
+          </a>
         </div>
       </div>
 
