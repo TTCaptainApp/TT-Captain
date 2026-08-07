@@ -83,6 +83,7 @@ function Dashboard({ session }) {
   }
 
   const ladeGeburtstage = async () => {
+    // 1. Eigener Geburtstag prüfen (eigene Zeile – weiterhin direkt erlaubt)
     const { data: eigenerBenutzer } = await supabase
       .from('benutzer')
       .select('geburtsdatum')
@@ -94,42 +95,21 @@ function Dashboard({ session }) {
       setIstHeuteGeburtstag(stats?.tage === 0)
     }
 
-    const { data: meineZuordnungen } = await supabase
-      .from('mannschaftszuordnungen')
-      .select('mannschaft_id')
-      .eq('benutzer_id', session.user.id)
+    // 2. Mannschaftskameraden über RPC (gibt nie das rohe Geburtsdatum zurück, DSGVO)
+    const { data: geburtstage, error } = await supabase.rpc('mannschaftskameraden_geburtstage')
+    if (error) {
+      console.error('Fehler beim Laden der Geburtstage:', error)
+      setGeburtstageKameraden([])
+      return
+    }
 
-    const mannschaftIds = (meineZuordnungen || []).map(z => z.mannschaft_id)
-    if (mannschaftIds.length === 0) return
-
-    const { data: kollegenZuordnungen } = await supabase
-      .from('mannschaftszuordnungen')
-      .select('benutzer(id, vorname, nachname, geburtsdatum)')
-      .in('mannschaft_id', mannschaftIds)
-      .neq('benutzer_id', session.user.id)
-
-    const verarbeiteteIds = new Set()
-    const geburtstagsListe = []
-
-    ;(kollegenZuordnungen || []).forEach(z => {
-      const b = z.benutzer
-      if (b && b.geburtsdatum && !verarbeiteteIds.has(b.id)) {
-        verarbeiteteIds.add(b.id)
-        const stats = berechneTageBisGeburtstag(b.geburtsdatum)
-        if (stats && stats.tage >= 0 && stats.tage <= 3) {
-          geburtstagsListe.push({
-            id: b.id,
-            vorname: b.vorname,
-            nachname: b.nachname,
-            tage: stats.tage,
-            alter: stats.alter
-          })
-        }
-      }
-    })
-
-    geburtstagsListe.sort((a, b) => a.tage - b.tage)
-    setGeburtstageKameraden(geburtstagsListe)
+    setGeburtstageKameraden((geburtstage || []).map(g => ({
+      id: g.benutzer_id,
+      vorname: g.vorname,
+      nachname: g.nachname,
+      tage: g.tage_bis_geburtstag,
+      alter: g.wird_alter
+    })))
   }
 
   const ladeNaechstesSpiel = async () => {
@@ -554,4 +534,3 @@ function Dashboard({ session }) {
 }
 
 export default Dashboard
- 
