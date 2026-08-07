@@ -62,14 +62,33 @@ function Mannschaften({ session }) {
   }
 
   const ladeKader = async (mannschaftId) => {
-    const { data } = await supabase
+    const { data: zuordnungen } = await supabase
       .from('mannschaftszuordnungen')
-      .select('id, rolle, benutzer(id, vorname, nachname, qttr)')
+      .select('benutzer_id, rolle')
       .eq('mannschaft_id', mannschaftId)
 
-    const liste = (data || [])
-      .filter(z => z.benutzer)
-      .map(z => ({ id: z.benutzer.id, vorname: z.benutzer.vorname, nachname: z.benutzer.nachname, qttr: z.benutzer.qttr, rolle: z.rolle }))
+    const ids = (zuordnungen || []).map(z => z.benutzer_id)
+    if (ids.length === 0) {
+      setKader(prev => ({ ...prev, [mannschaftId]: [] }))
+      return
+    }
+
+    const { data: profile } = await supabase
+      .from('benutzer_profile')
+      .select('id, vorname, nachname, qttr')
+      .in('id', ids)
+
+    const profilLex = Object.fromEntries((profile || []).map(p => [p.id, p]))
+
+    const liste = (zuordnungen || [])
+      .filter(z => profilLex[z.benutzer_id])
+      .map(z => ({
+        id: z.benutzer_id,
+        vorname: profilLex[z.benutzer_id].vorname,
+        nachname: profilLex[z.benutzer_id].nachname,
+        qttr: profilLex[z.benutzer_id].qttr,
+        rolle: z.rolle
+      }))
       .sort((a, b) => (b.qttr ?? -1) - (a.qttr ?? -1))
 
     setKader(prev => ({ ...prev, [mannschaftId]: liste }))
