@@ -25,6 +25,9 @@ function Admin({ session }) {
   const [zeigeArchivierte, setZeigeArchivierte] = useState(false)
   const [archivierenLaeuft, setArchivierenLaeuft] = useState(false)
 
+  // Konto endgültig löschen
+  const [loeschenLaeuft, setLoeschenLaeuft] = useState(null) // userId, während Löschung läuft
+
   const datenLaden = async () => {
     try {
       setLadend(true)
@@ -172,20 +175,26 @@ function Admin({ session }) {
     }
   }
 
+  // Ruft die Edge Function "delete-account" auf: löscht Profil + alle abhängigen Daten + echten Login-Account
   const loeschantragBestaetigen = async (userId) => {
-    if (!confirm('Möchten Sie diesen Benutzer endgültig löschen?')) return
+    if (!confirm('Möchten Sie diesen Benutzer endgültig löschen? Dies kann nicht rückgängig gemacht werden.')) return
+    setMeldung(null)
+    setLoeschenLaeuft(userId)
     try {
-      const { error } = await supabase
-        .from('benutzer')
-        .delete()
-        .eq('id', userId)
+      const { data, error } = await supabase.functions.invoke('delete-account', {
+        body: { user_id: userId }
+      })
 
       if (error) throw error
-      setMeldung({ typ: 'success', text: 'Benutzer erfolgreich gelöscht.' })
+      if (data?.error) throw new Error(data.error)
+
+      setMeldung({ typ: 'success', text: 'Benutzer wurde vollständig gelöscht (inkl. Login-Konto).' })
       datenLaden()
     } catch (err) {
       console.error(err)
-      setMeldung({ typ: 'error', text: 'Fehler beim Löschen des Benutzers.' })
+      setMeldung({ typ: 'error', text: 'Fehler beim Löschen des Benutzers: ' + err.message })
+    } finally {
+      setLoeschenLaeuft(null)
     }
   }
 
@@ -596,6 +605,7 @@ function Admin({ session }) {
                   </div>
                   <button 
                     onClick={() => loeschantragBestaetigen(l.id)}
+                    disabled={loeschenLaeuft === l.id}
                     style={{
                       background: '#991B1B',
                       color: 'white',
@@ -604,12 +614,13 @@ function Admin({ session }) {
                       padding: '8px 12px',
                       fontSize: 12,
                       fontWeight: 600,
-                      cursor: 'pointer',
+                      cursor: loeschenLaeuft === l.id ? 'default' : 'pointer',
                       fontFamily: 'Inter, sans-serif',
-                      whiteSpace: 'nowrap'
+                      whiteSpace: 'nowrap',
+                      opacity: loeschenLaeuft === l.id ? 0.6 : 1
                     }}
                   >
-                    ✓ Löschen
+                    {loeschenLaeuft === l.id ? '...' : '✓ Löschen'}
                   </button>
                 </div>
               ))}
