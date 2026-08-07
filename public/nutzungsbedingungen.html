@@ -3,16 +3,191 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Nutzungsbedingungen – TT Captain</title>
+<title>Nutzungsbedingungen | TT Captain</title>
 <style>
-  body{font-family:sans-serif;background:#F6FAF8;color:#16261F;max-width:640px;margin:0 auto;padding:32px 20px;line-height:1.6;}
-  h1{color:#1C8A4E;}
-  a{color:#1C8A4E;}
+  :root{
+      --primary:#f15a24;
+      --primary-dark:#d94f1f;
+      --background:#f5f5f5;
+      --card:#ffffff;
+      --text:#222;
+      --border:#ececec;
+  }
+
+  *{
+      margin:0;
+      padding:0;
+      box-sizing:border-box;
+  }
+
+  body{
+      background:var(--background);
+      font-family:Arial,Helvetica,sans-serif;
+      color:var(--text);
+  }
+
+  header{
+      background:white;
+      padding:22px;
+      text-align:center;
+      border-bottom:1px solid #e8e8e8;
+  }
+
+  .logo{
+      font-size:34px;
+      margin-bottom:6px;
+  }
+
+  header h1{
+      color:var(--primary);
+      font-size:28px;
+  }
+
+  .container{
+      max-width:900px;
+      margin:auto;
+      padding:20px;
+  }
+
+  .card{
+      background:var(--card);
+      border:2px solid var(--primary);
+      border-radius:20px;
+      padding:24px;
+      margin-bottom:20px;
+  }
+
+  h2{
+      color:var(--primary);
+      margin-bottom:18px;
+      font-size:22px;
+  }
+
+  p, li{
+      line-height:1.8;
+      margin-bottom:14px;
+  }
+
+  ul{
+      margin-left:20px;
+      margin-bottom:14px;
+  }
+
+  a{
+      color:var(--primary);
+      text-decoration:none;
+  }
+
+  a:hover{
+      text-decoration:underline;
+  }
+
+  .button-area{
+      display:flex;
+      gap:12px;
+      flex-wrap:wrap;
+      margin-top:30px;
+  }
+
+  .button{
+      flex:1;
+      min-width:170px;
+      text-align:center;
+      background:var(--primary);
+      color:white;
+      padding:14px;
+      border-radius:12px;
+      text-decoration:none;
+      font-weight:bold;
+      transition:.2s;
+  }
+
+  .button:hover{
+      background:var(--primary-dark);
+      text-decoration:none;
+  }
+
+  footer{
+      text-align:center;
+      color:#666;
+      padding:25px;
+      font-size:14px;
+  }
 </style>
 </head>
 <body>
-  <h1>Nutzungsbedingungen</h1>
-  <p><em>TODO: Wird vor dem öffentlichen Start vollständig ausformuliert.</em></p>
-  <p><a href="/">Zurück zur App</a></p>
+
+<header>
+  <div class="logo">🏓</div>
+  <h1>TT Captain</h1>
+</header>
+
+<div class="container">
+
+  <div class="card">
+    <h2>Nutzungsbedingungen</h2>
+    <p>Diese Nutzungsbedingungen regeln die Nutzung der Web-Anwendung <strong>TT Captain</strong> (nachfolgend „App“ genannt), bereitgestellt durch den im Impressum genannten Betreiber.</p>
+  </div>
+
+  <div class="card">
+    <h2>1. Geltungsbereich & Leistungsbeschreibung</h2>
+    <p>
+      1.1. Die App dient der vereinsinternen Organisation des Tischtennis-Punktspielbetriebs (u. a. Verwaltung von Verfügbarkeiten, Aufstellungen, Ersatzspielersuche und Team-Kommunikation).<br>
+      1.2. Ein Anspruch auf ständige Verfügbarkeit, Fehlerfreiheit oder bestimmte Leistungsmerkmale der kostenlosen Anwendung besteht nicht. Der Betreiber behält sich vor, den Dienst jederzeit zu ändern, einzuschränken oder einzustellen.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>2. Registrierung & Nutzerkonto</h2>
+    <p>
+      2.1. Die Nutzung bestimmter Funktionen erfordert die Registrierung eines Benutzerkontos unter Angabe einer gültigen E-Mail-Adresse und eines Passworts.<br>
+      2.2. Nutzer sind verpflichtet, ihre Zugangsdaten geheim zu halten und vor unbefugtem Zugriff Dritter zu schützen.<br>
+      2.3. Der Betreiber ist berechtigt, Accounts bei Verstößen gegen diese Bedingungen oder bei inaktiver Nutzung vorübergehend zu sperren oder zu löschen.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>3. Pflichten der Nutzer</h2>
+    <p>
+      3.1. Nutzer verpflichten sich, keine rechtswidrigen, beleidigenden, verleumderischen oder gegen die guten Sitten verstoßenden Inhalte (z. B. in Chat-Nachrichten) zu verbreiten.<br>
+      3.2. Es ist untersagt, technische Mechanismen, Skripte oder automatisierte Abfragen einzusetzen, die den Betrieb der App, die Sicherheit der Datenbank (Supabase) oder die Rechte Dritter gefährden oder stören.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>4. Haftungsbeschränkung</h2>
+    <p>
+      4.1. Für Schäden, die durch leichte Fahrlässigkeit verursacht werden, haftet der Betreiber nur bei Verletzung wesentlicher Vertragspflichten (Kardinalpflichten). Die Haftung ist in diesem Fall auf den vorhersehbaren, vertragstypischen Schaden begrenzt.<br>
+      4.2. Die vorstehende Haftungsbeschränkung gilt nicht für Schäden aus der Verletzung des Lebens, des Körpers oder der Gesundheit sowie für Ansprüche nach dem Produkthaftungsgesetz.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>5. Datenschutz</h2>
+    <p>
+      Die Verarbeitung personenbezogener Daten im Rahmen der App erfolgt im Einklang mit der <a href="/datenschutz.html">Datenschutzerklärung</a> und den Vorgaben der DSGVO. Mit der Nutzung der App erklären Sie sich mit der dort beschriebenen Datenverarbeitung einverstanden.
+    </p>
+  </div>
+
+  <div class="card">
+    <h2>6. Schlussbestimmungen</h2>
+    <p>
+      6.1. Es gilt das Recht der Bundesrepublik Deutschland.<br>
+      6.2. Sollten einzelne Bestimmungen dieser Nutzungsbedingungen unwirksam sein oder werden, so bleibt die Wirksamkeit der übrigen Bestimmungen hiervon unberührt.
+    </p>
+  </div>
+
+  <div class="button-area">
+    <a class="button" href="/">🏠 Zur Startseite</a>
+    <a class="button" href="/datenschutz.html">🔒 Datenschutz</a>
+    <a class="button" href="/impressum.html">📄 Impressum</a>
+  </div>
+
+</div>
+
+<footer>
+  © 2026 TT Captain
+</footer>
+
 </body>
 </html>
