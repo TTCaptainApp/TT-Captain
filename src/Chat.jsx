@@ -6,6 +6,9 @@ import BottomNav from './BottomNav'
 
 const EMOJIS = ['😀','😂','👍','🙏','🏓','🔥','😉','😢','🎉','❤️','👏','🤔','😴','⏰','📍']
 
+// Gültigkeitsdauer signierter Medien-URLs in Sekunden (24 Stunden)
+const MEDIEN_URL_GUELTIGKEIT_SEK = 60 * 60 * 24
+
 function Chat({ session }) {
   const { mannschaftId, spielId } = useParams()
   const typ = mannschaftId ? 'mannschaft' : spielId ? 'spiel' : 'spielfuehrer'
@@ -72,6 +75,22 @@ function Chat({ session }) {
     return parts.length > 0 ? parts : text
   }
 
+  // Erzeugt für eine Liste von Nachrichten mit Medien-Pfad die passenden signierten URLs
+  const medienUrlsAufloesen = async (nachrichtenListe) => {
+    const mitMedien = nachrichtenListe.filter(n => n.medien_url)
+    if (mitMedien.length === 0) return {}
+
+    const { data: signierte, error } = await supabase.storage
+      .from('chat-medien')
+      .createSignedUrls(mitMedien.map(n => n.medien_url), MEDIEN_URL_GUELTIGKEIT_SEK)
+
+    if (error || !signierte) return {}
+
+    return Object.fromEntries(
+      signierte.filter(s => s.signedUrl).map(s => [s.path, s.signedUrl])
+    )
+  }
+
   const initialLaden = async (cId) => {
     const namenQuery = typ === 'spielfuehrer' ? supabase.rpc('spielfuehrer_namen') : supabase.rpc('teamkollegen_namen')
 
@@ -89,7 +108,13 @@ function Chat({ session }) {
     namenLexikonRef.current = lex
 
     const data = nachrichtenData || []
-    setNachrichten(data.map(n => ({ ...n, name: lex[n.benutzer_id] || (n.benutzer_id === session.user.id ? 'Du' : '?') })))
+    const signierteUrlMap = await medienUrlsAufloesen(data)
+
+    setNachrichten(data.map(n => ({
+      ...n,
+      name: lex[n.benutzer_id] || (n.benutzer_id === session.user.id ? 'Du' : '?'),
+      medienAnzeigeUrl: n.medien_url ? (signierteUrlMap[n.medien_url] || null) : null
+    })))
 
     const alleIds = data.map(n => n.id)
     if (alleIds.length === 0) { setLadend(false); return }
@@ -232,7 +257,15 @@ function Chat({ session }) {
           const neue = payload.new
           const name = neue.benutzer_id === session.user.id ? 'Du' : (namenLexikonRef.current[neue.benutzer_id] || '?')
 
-          setNachrichten(prev => prev.some(n => n.id === neue.id) ? prev : [...prev, { ...neue, name }])
+          let medienAnzeigeUrl = null
+          if (neue.medien_url) {
+            const { data: signiert } = await supabase.storage
+              .from('chat-medien')
+              .createSignedUrl(neue.medien_url, MEDIEN_URL_GUELTIGKEIT_SEK)
+            medienAnzeigeUrl = signiert?.signedUrl || null
+          }
+
+          setNachrichten(prev => prev.some(n => n.id === neue.id) ? prev : [...prev, { ...neue, name, medienAnzeigeUrl }])
           setScrollZuNachrichtId(null)
 
           if (neue.benutzer_id !== session.user.id) {
@@ -316,6 +349,8 @@ function Chat({ session }) {
     name.toLowerCase().includes(mentionSuchbegriff.toLowerCase())
   )
 
+  // Speichert nur noch den Datei-PFAD in nachrichten.medien_url (nicht mehr die volle URL) —
+  // der Bucket ist privat, eine feste URL wäre ohnehin nicht dauerhaft nutzbar.
   const fotoSenden = async (e) => {
     const datei = e.target.files[0]
     if (!datei || !chatId) return
@@ -324,8 +359,8 @@ function Chat({ session }) {
     const dateiPfad = `${chatId}/${Date.now()}_${datei.name}`
     const { error: uploadError } = await supabase.storage.from('chat-medien').upload(dateiPfad, datei)
     if (uploadError) { setFehler(uploadError.message); setMedienHochladend(false); return }
-    const { data: urlData } = supabase.storage.from('chat-medien').getPublicUrl(dateiPfad)
-    await supabase.from('nachrichten').insert({ chat_id: chatId, benutzer_id: session.user.id, text: '📷 Foto', medien_url: urlData.publicUrl })
+    const { error: insertError } = await supabase.from('nachrichten').insert({ chat_id: chatId, benutzer_id: session.user.id, text: '📷 Foto', medien_url: dateiPfad })
+    if (insertError) setFehler(insertError.message)
     setMedienHochladend(false)
   }
 
@@ -401,7 +436,9 @@ function Chat({ session }) {
                   border: istScrollZiel ? '2px solid #1C8A4E' : 'none'
                 }}>
                   {n.medien_url && (
-                    <img src={n.medien_url} alt="Foto" style={{ maxWidth: '100%', borderRadius: 8, marginBottom: 4, display: 'block' }} />
+                    n.medienAnzeigeUrl
+                      ? <img src={n.medienAnzeigeUrl} alt="Foto" style={{ maxWidth: '100%', borderRadius: 8, marginBottom: 4, display: 'block' }} />
+                      : <div style={{ fontSize: 12, color: '#667781', padding: '4px 0' }}>📷 Foto (nicht verfügbar)</div>
                   )}
                   {n.standort_lat && (
                     <a href={`https://www.google.com/maps?q=${n.standort_lat},${n.standort_lng}`} target="_blank" rel="noreferrer" style={{ color: '#1C8A4E', fontWeight: 600, fontSize: 13 }}>
